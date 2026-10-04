@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "prove": "vitest run -c vitest.proofs.config.mts",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:db": "node scripts/db-test.mjs",
@@ -59,7 +60,8 @@
     "serve": "^14.2.6",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "z3-solver": "^4.16.0"
   },
   "engines": {
     "node": ">=20"

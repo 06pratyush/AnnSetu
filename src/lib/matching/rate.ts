@@ -38,6 +38,11 @@ export type RateSuggestion =
   | { ok: false; reason: "no_room"; lowest: number; highest: number; breakEvenQty: number; steps: RateStep[] };
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
+// The band in whole paise. Rounding after clamping could step outside it (a highest price of
+// 24.906 rounds to 24.91), so the bounds are rounded inwards first. The mandi price is already in
+// whole paise; the 0.000001 only absorbs floating-point noise such as 22.35 * 100 = 2235.0000000000005.
+const paiseAtLeast = (x: number) => Math.ceil(x * 100 - 0.000001) / 100;
+const paiseAtMost = (x: number) => Math.floor(x * 100) / 100;
 
 export function suggestRate(i: RateInputs, s: Pick<EngineSettings, "farmerShare" | "nudgeCap" | "nudgeMinRequests" | "lotCutPer100" | "lotCutMax">): RateSuggestion {
   const steps: RateStep[] = [];
@@ -49,7 +54,9 @@ export function suggestRate(i: RateInputs, s: Pick<EngineSettings, "farmerShare"
   steps.push({ key: "highest", value: highest });
   const room = highest - lowest;
   steps.push({ key: "room", value: room });
-  if (!(room > 0)) {
+  const lo = paiseAtLeast(lowest);
+  const hi = paiseAtMost(highest);
+  if (!(room > 0) || hi < lo) {
     const gap = i.shop - i.mandi;
     return { ok: false, reason: "no_room", lowest, highest, breakEvenQty: gap > 0 ? i.tripCost / gap : Infinity, steps };
   }
@@ -74,7 +81,7 @@ export function suggestRate(i: RateInputs, s: Pick<EngineSettings, "farmerShare"
   price = price * (1 - cut);
   steps.push({ key: "bigLot", value: price, cut });
 
-  const final = r2(Math.min(highest, Math.max(lowest, price)));
+  const final = Math.min(hi, Math.max(lo, r2(price)));
   steps.push({ key: "final", value: final });
   return { ok: true, price: final, lowest, highest, steps };
 }

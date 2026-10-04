@@ -64,11 +64,13 @@ describe("rate suggestion: 200,000 random tries", () => {
   // Deterministic pseudo-random numbers so a failure can be replayed.
   let seed = 12345;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  // Mandi and shop prices are stored in whole paise (numeric(12,2)), so the inputs are too.
+  const paise = (x: number) => Math.round(x * 100) / 100;
   const randomInputs = (): RateInputs => {
-    const mandi = 2 + rnd() * 200;
+    const mandi = paise(2 + rnd() * 200);
     return {
       mandi,
-      shop: mandi * (1 + rnd() * 4),
+      shop: paise(mandi * (1 + rnd() * 4)),
       tripCost: rnd() * 3000,
       tripQty: 1 + rnd() * 2000,
       demandQty: rnd() * 5000,
@@ -85,12 +87,15 @@ describe("rate suggestion: 200,000 random tries", () => {
       const i = randomInputs();
       const r = suggestRate(i, S);
       if (!r.ok) {
-        expect(i.shop - i.tripCost / i.tripQty - i.mandi).toBeLessThanOrEqual(0);
+        // No room, or less than one paisa of it.
+        expect(i.shop - i.tripCost / i.tripQty - i.mandi).toBeLessThan(0.01);
         continue;
       }
       priced++;
-      expect(r.price).toBeGreaterThanOrEqual(Math.round(i.mandi * 100) / 100 - 0.005);
-      expect(r.price).toBeLessThanOrEqual(Math.round((i.shop - i.tripCost / i.tripQty) * 100) / 100 + 0.005);
+      // Exact, no slack: proved for every input in proofs/rate.proof.ts.
+      expect(r.price).toBeGreaterThanOrEqual(i.mandi);
+      expect(r.price).toBeLessThanOrEqual(i.shop - i.tripCost / i.tripQty);
+      expect(Math.abs(r.price * 100 - Math.round(r.price * 100))).toBeLessThan(1e-6);
     }
     expect(priced).toBeGreaterThan(50_000);
   });
@@ -104,9 +109,9 @@ describe("rate suggestion: 200,000 random tries", () => {
         const r = suggestRate({ ...i, ...j }, S);
         return r.ok ? r.price : Infinity;
       };
-      expect(more({ demandQty: i.demandQty * 1.5 + 1 })).toBeGreaterThanOrEqual(base.price - 0.005);
-      expect(more({ lifeLeft: Math.min(1, i.lifeLeft + 0.2) })).toBeGreaterThanOrEqual(base.price - 0.005);
-      expect(more({ shop: i.shop * 1.2 })).toBeGreaterThanOrEqual(base.price - 0.005);
+      expect(more({ demandQty: i.demandQty * 1.5 + 1 })).toBeGreaterThanOrEqual(base.price);
+      expect(more({ lifeLeft: Math.min(1, i.lifeLeft + 0.2) })).toBeGreaterThanOrEqual(base.price);
+      expect(more({ shop: i.shop * 1.2 })).toBeGreaterThanOrEqual(base.price);
       const glut = suggestRate({ ...i, supplyQty: i.supplyQty * 2 }, S);
       if (glut.ok) expect(glut.price).toBeLessThanOrEqual(base.price + 0.005);
     }
