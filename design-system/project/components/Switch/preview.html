@@ -1,0 +1,9 @@
+<!-- @dsCard group="Inputs" height=80 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h("label", { className: "flex items-center gap-3 text-body" }, h(A.Switch, { defaultChecked: true, "aria-label": "Organic only" }), "Organic only");
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

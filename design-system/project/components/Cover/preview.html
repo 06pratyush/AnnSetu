@@ -1,0 +1,35 @@
+<!-- @dsCard height=288 -->
+<div class="ds-cover">
+  <style>
+    .ds-cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--bg); }
+    .ds-cover svg { position: absolute; inset: 0; }
+    .ds-cover .khet { fill: var(--khet); }
+    .ds-cover .neel { fill: var(--neel); }
+    .ds-cover .ink { fill: var(--ink); }
+    .ds-cover .grain { fill: var(--haldi); }
+    .ds-cover .arc { fill: none; stroke: var(--haldi); stroke-width: 12px; stroke-linecap: round; }
+    .ds-cover .slab { rx: var(--radius-lg); }
+    .ds-cover .deck { rx: var(--radius-sm); }
+    .ds-cover .text { position: absolute; left: 40px; bottom: 40px; max-width: 440px; }
+    .ds-cover .name { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 96px; line-height: 0.95; color: var(--ink); letter-spacing: -0.01em; }
+    .ds-cover .tag { margin: 12px 0 0; font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink-muted); }
+  </style>
+  <svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <!--
+      blocks: khet slab 160x200 (farm bank) and neel slab 160x200 (buyer bank), ink deck 144x24, haldi grain 24x32
+      arrangement: two banks bleeding off the bottom (neel also off the right), the deck joining them at the foot
+      pattern: arcs from radii (literal motif: the setu, a bridge), two haldi spans rising from the banks
+      scales: radius-lg slabs, radius-sm deck, arc radii 72/112 (space-12 + 40), 12px stroke (space-3)
+    -->
+    <rect class="khet slab" x="496" y="104" width="160" height="200" />
+    <rect class="neel slab" x="800" y="104" width="176" height="200" />
+    <rect class="ink deck" x="656" y="232" width="144" height="24" />
+    <path class="arc" d="M 656 104 A 72 72 0 0 1 800 104" />
+    <path class="arc" d="M 616 104 A 112 112 0 0 1 840 104" />
+    <ellipse class="grain" cx="728" cy="32" rx="12" ry="16" />
+  </svg>
+  <div class="text">
+    <p class="name">AnnSetu</p>
+    <p class="tag">The bridge between farm and buyer · खेत और खरीदार के बीच का पुल</p>
+  </div>
+</div>

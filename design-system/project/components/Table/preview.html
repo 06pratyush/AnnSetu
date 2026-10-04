@@ -1,0 +1,10 @@
+<!-- @dsCard group="Stock & figures" height=180 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.Table, null, h(A.THead, null, h(A.TR, null, h(A.TH, null, "Produce"), h(A.TH, { className: "text-right" }, "Sold"), h(A.TH, { className: "text-right" }, "Unsold"))),
+    h(A.TBody, null, h(A.TR, null, h(A.TD, null, "Tomato"), h(A.TD, { numeric: true }, "62 kg"), h(A.TD, { numeric: true }, "24 kg")), h(A.TR, null, h(A.TD, null, "Wheat"), h(A.TD, { numeric: true }, "12 quintal"), h(A.TD, { numeric: true }, "23 quintal"))));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

@@ -1,0 +1,10 @@
+<!-- @dsCard group="Inputs" height=100 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.Tabs, { defaultValue: "active" }, h(A.TabsList, null,
+    h(A.TabsTrigger, { value: "active" }, "Active"), h(A.TabsTrigger, { value: "completed" }, "Completed"), h(A.TabsTrigger, { value: "all" }, "All")));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

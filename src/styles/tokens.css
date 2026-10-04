@@ -1,0 +1,198 @@
+/*
+ * AnnSetu design tokens: the single source of truth.
+ * scripts/ds/build-tokens.mjs turns this file into design-system/project/tokens.json,
+ * and scripts/check-contrast.mjs checks every text/background pair it declares.
+ * The comment after each declaration is the token's usage note.
+ *
+ * Theme states: data-theme="light" | "dark" on <html>, or no attribute = follow the OS.
+ */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Neutrals: biased slightly toward the field green */
+  --bg: #f7f8f4; /* Page background behind every screen. */
+  --surface: #ffffff; /* Cards, sheets, inputs and chart grounds. */
+  --sunken: #eef1ea; /* Wells, table headers, photo placeholders, skeletons. */
+  --ink: #17201a; /* Primary text on bg, surface and sunken. */
+  --ink-muted: #4f5b52; /* Secondary text, hints, captions on bg, surface and sunken. */
+  --border: #d9ded3; /* Decorative dividers and card outlines (not for controls). */
+  --border-strong: #7d8a80; /* Input, select and checkbox outlines; meets 3:1 on surface. */
+
+  /* Khet: field green, the farmer role and the primary action color */
+  --khet: #1e5e3f; /* Primary buttons, farmer chrome, links; also text on bg and surface. */
+  --khet-hover: #174c33; /* Hover and pressed state of khet fills. */
+  --khet-soft: #e3f0e8; /* Selected rows, farmer nav highlight, soft badges. */
+  --on-khet: #ffffff; /* Text and icons on khet fills. */
+
+  /* Neel: indigo, the buyer role and the focus ring */
+  --neel: #2f3d8f; /* Buyer chrome, buyer primary buttons, links in the buyer area. */
+  --neel-hover: #25317a; /* Hover and pressed state of neel fills. */
+  --neel-soft: #e7eaf8; /* Buyer nav highlight, selected chips in the buyer area. */
+  --on-neel: #ffffff; /* Text and icons on neel fills. */
+
+  /* Haldi: turmeric, the accent for demand and attention */
+  --haldi: #f2b61f; /* "In demand" highlights, cart count, accent fills; never text. */
+  --haldi-hover: #dfa30f; /* Hover state of haldi fills. */
+  --haldi-soft: #fdf3d3; /* Background of demand cards and accent callouts. */
+  --on-haldi: #1c1a12; /* Text and icons on haldi fills. */
+  --haldi-ink: #7a5000; /* Accent text on haldi-soft, bg and surface. */
+
+  /* Status: always paired with an icon and a word */
+  --success: #1f6b33; /* Delivered, sold, saved: text and icons on success-soft and surface. */
+  --success-soft: #e4f4e6; /* Background of success badges and alerts. */
+  --warning: #8a5200; /* Pending, low stock: text and icons on warning-soft and surface. */
+  --warning-soft: #fff1d6; /* Background of warning badges and alerts. */
+  --danger: #b42318; /* Rejected, cancelled, spoiled, errors: text on danger-soft and surface; destructive fills. */
+  --danger-hover: #9a1c13; /* Hover state of destructive fills. */
+  --danger-soft: #fdeaea; /* Background of error badges, alerts and invalid fields. */
+  --on-danger: #ffffff; /* Text and icons on danger fills. */
+  --info: #1c5f99; /* New and placed states, informational notes: text on info-soft and surface. */
+  --info-soft: #e3f0fb; /* Background of info badges and alerts. */
+
+  --focus: #2f3d8f; /* Focus ring: 3px solid with 2px offset, on every surface. */
+  --scrim: rgba(15, 21, 17, 0.55); /* Overlay behind dialogs and sheets. */
+
+  /* Charts: validated categorical order (dataviz checks pass on surface) */
+  --chart-1: #037046; /* Series 1 and "sold" stock. */
+  --chart-2: #b88a17; /* Series 2 and "reserved" stock. */
+  --chart-3: #3746b2; /* Series 3. */
+  --chart-4: #aa3f12; /* Series 4. */
+  --chart-5: #2b9e81; /* Series 5. */
+  --stock-track: #dde9e1; /* Unfilled track of the stock bar = available (unsold) stock. */
+  --chart-grid: #e6eae2; /* Hairline gridlines and axes in charts. */
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(23, 32, 26, 0.06), 0 2px 8px rgba(23, 32, 26, 0.06); /* Hovered cards. */
+  --shadow-2: 0 10px 30px rgba(23, 32, 26, 0.16); /* Popovers, menus, dialogs and sheets. */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1511;
+    --surface: #172019;
+    --sunken: #0b100d;
+    --ink: #e8eee8;
+    --ink-muted: #a7b3aa;
+    --border: #2a352d;
+    --border-strong: #6f7d73;
+    --khet: #58c08a;
+    --khet-hover: #6fcd9b;
+    --khet-soft: #183626;
+    --on-khet: #062012;
+    --neel: #9aa8ff;
+    --neel-hover: #b0bbff;
+    --neel-soft: #1e2550;
+    --on-neel: #0e1440;
+    --haldi: #f5c443;
+    --haldi-hover: #f8d068;
+    --haldi-soft: #3a2e0e;
+    --on-haldi: #1c1a12;
+    --haldi-ink: #f5c443;
+    --success: #7fd493;
+    --success-soft: #16301d;
+    --warning: #f2c46b;
+    --warning-soft: #3a2a0c;
+    --danger: #f0857a;
+    --danger-hover: #f49c93;
+    --danger-soft: #3a1512;
+    --on-danger: #2a0703;
+    --info: #8ec3f2;
+    --info-soft: #12283d;
+    --focus: #9aa8ff;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --chart-1: #2a8457;
+    --chart-2: #ba8b14;
+    --chart-3: #5a6fd0;
+    --chart-4: #e0612f;
+    --chart-5: #3aa98b;
+    --stock-track: #24382c;
+    --chart-grid: #26312a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.55);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1511;
+  --surface: #172019;
+  --sunken: #0b100d;
+  --ink: #e8eee8;
+  --ink-muted: #a7b3aa;
+  --border: #2a352d;
+  --border-strong: #6f7d73;
+  --khet: #58c08a;
+  --khet-hover: #6fcd9b;
+  --khet-soft: #183626;
+  --on-khet: #062012;
+  --neel: #9aa8ff;
+  --neel-hover: #b0bbff;
+  --neel-soft: #1e2550;
+  --on-neel: #0e1440;
+  --haldi: #f5c443;
+  --haldi-hover: #f8d068;
+  --haldi-soft: #3a2e0e;
+  --on-haldi: #1c1a12;
+  --haldi-ink: #f5c443;
+  --success: #7fd493;
+  --success-soft: #16301d;
+  --warning: #f2c46b;
+  --warning-soft: #3a2a0c;
+  --danger: #f0857a;
+  --danger-hover: #f49c93;
+  --danger-soft: #3a1512;
+  --on-danger: #2a0703;
+  --info: #8ec3f2;
+  --info-soft: #12283d;
+  --focus: #9aa8ff;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --chart-1: #2a8457;
+  --chart-2: #ba8b14;
+  --chart-3: #5a6fd0;
+  --chart-4: #e0612f;
+  --chart-5: #3aa98b;
+  --stock-track: #24382c;
+  --chart-grid: #26312a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+/* Role color: the chrome follows the side of the bridge the user is on. */
+:root,
+[data-role="farmer"] {
+  --role: var(--khet);
+  --role-hover: var(--khet-hover);
+  --role-soft: var(--khet-soft);
+  --on-role: var(--on-khet);
+}
+[data-role="buyer"] {
+  --role: var(--neel);
+  --role-hover: var(--neel-hover);
+  --role-soft: var(--neel-soft);
+  --on-role: var(--on-neel);
+}
+
+/* Type families, spacing, radius: theme-independent */
+:root {
+  --family-display: var(--font-anek, "Anek Devanagari"), "Mukta", system-ui, sans-serif; /* Headings, wordmark, KPI figures. */
+  --family-body: var(--font-mukta, "Mukta"), "Noto Sans Devanagari", system-ui, sans-serif; /* Everything else: body, UI, tables. */
+
+  --space-1: 4px; /* Icon-to-label gap. */
+  --space-2: 8px; /* Gap inside chips and compact rows. */
+  --space-3: 12px; /* Input padding, gap between form rows on phones. */
+  --space-4: 16px; /* Card padding on phones, page gutter. */
+  --space-5: 20px; /* Gap between related cards. */
+  --space-6: 24px; /* Card padding on desktop, section gaps. */
+  --space-8: 32px; /* Gap between page sections. */
+  --space-10: 40px; /* Top of page header to content. */
+  --space-12: 48px; /* Minimum touch target in the farmer area. */
+  --space-16: 64px; /* Landing page section rhythm. */
+
+  --radius-sm: 6px; /* Inputs, chips, badges, checkboxes. */
+  --radius-md: 10px; /* Buttons, cards, photos. */
+  --radius-lg: 16px; /* Dialogs, sheets, the landing hero panels. */
+  --radius-full: 9999px; /* Pills, avatars, the stock bar ends. */
+}

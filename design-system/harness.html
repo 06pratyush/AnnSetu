@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AnnSetu previews: local harness</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; background: #ddd; }
+  .card { background: #fff; margin: 0 0 16px; border: 1px solid #999; }
+  .card h2 { font-size: 14px; margin: 0; padding: 6px 8px; background: #eee; display: flex; justify-content: space-between; }
+  iframe { width: 100%; border: 0; display: block; }
+  .err { color: #b00; font-weight: bold; }
+</style>
+</head>
+<body>
+<p>Local check of every component preview (React 18 UMD + bundle.js + bundle.css), like the artifact frame. Theme: <select id="theme"><option>light</option><option>dark</option></select> Only: <input id="only" placeholder="StockBar" /></p>
+<div id="out"></div>
+<script>
+const names = ["Cover","Button","Field","QuantityStepper","Checkbox","Switch","ChipInput","RoleChoiceCards","LanguageToggle","CategoryChips","SearchFilterBar","RatingStars","PhotoUploader","Tabs","Badge","Alert","EmptyState","ConfirmDialog","Skeleton","StockBar","StatCard","PriceTag","LedgerEntry","Table","ProduceCard","ProduceRow","FarmerCard","CartLine","CartSummary","OrderStatusBadge","OrderTimeline","OrderCard","DemandCard","SuggestionPanel","BrandMark","CategoryIcon","Avatar","Card"];
+const base = location.origin + "/project/components/";
+async function render() {
+  const theme = document.getElementById("theme").value;
+  const only = document.getElementById("only").value.trim();
+  const out = document.getElementById("out");
+  out.innerHTML = "";
+  for (const n of names.filter((x) => !only || x === only)) {
+    const html = await (await fetch(base + n + "/preview.html")).text();
+    const height = Number(/height=(\d+)/.exec(html)?.[1] ?? 120);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h2><span>${n}</span><span class="status">…</span></h2>`;
+    const frame = document.createElement("iframe");
+    frame.style.height = height + "px";
+    frame.srcdoc = `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8"><link rel="stylesheet" href="${base}bundle.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"><\/script>
+<script>window.onerror=function(m){parent.postMessage({n:${JSON.stringify(n)},err:String(m)},"*")}<\/script>
+<script src="${base}bundle.js"><\/script></head><body style="margin:0;background:var(--bg)">${html}
+<script>setTimeout(function(){parent.postMessage({n:${JSON.stringify(n)},ok:document.getElementById("root").innerHTML.length,h:document.documentElement.scrollHeight},"*")},800)<\/script></body></html>`;
+    card.appendChild(frame);
+    out.appendChild(card);
+  }
+}
+window.results = {};
+addEventListener("message", (e) => {
+  const { n, err, ok, h } = e.data || {};
+  if (!n) return;
+  window.results[n] = window.results[n] || {};
+  if (err) window.results[n].err = err;
+  if (ok !== undefined) Object.assign(window.results[n], { ok, h });
+  const card = [...document.querySelectorAll(".card")].find((c) => c.querySelector("span").textContent === n);
+  if (card) card.querySelector(".status").innerHTML = window.results[n].err ? `<span class=err>${window.results[n].err}</span>` : `${ok} chars, ${h}px`;
+});
+document.getElementById("theme").onchange = render;
+document.getElementById("only").onchange = render;
+render();
+</script>
+</body>
+</html>

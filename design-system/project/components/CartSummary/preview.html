@@ -1,0 +1,9 @@
+<!-- @dsCard group="Market" height=390 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.RoleScope, { role: "buyer" }, h("div", { className: "max-w-sm" }, h(A.CartSummary, { lines: S.sampleCart, action: h(A.Button, { size: "lg" }, "Place order") })));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

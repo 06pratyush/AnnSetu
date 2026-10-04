@@ -1,0 +1,9 @@
+<!-- @dsCard group="Identity" height=230 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.Card, null, h(A.CardHeader, null, h(A.CardTitle, null, "Earnings by week"), h(A.CardDescription, null, "Last 8 weeks, delivered orders")), h(A.CardContent, null, h(A.Skeleton, { className: "h-20" })));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

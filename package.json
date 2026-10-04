@@ -5,22 +5,59 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "serve out",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "test:db": "node scripts/db-test.mjs",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run check:i18n && npm run check:contrast && npm run test:db",
+    "db:bundle": "node scripts/bundle-sql.mjs",
+    "ds:tokens": "node scripts/ds/build-tokens.mjs",
+    "ds:docs": "node scripts/ds/build-docs.mjs",
+    "ds:bundle": "node scripts/ds/build-bundle.mjs",
+    "ds:build": "npm run ds:tokens && npm run ds:docs && npm run ds:bundle"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@supabase/supabase-js": "^2.117.2",
+    "@tanstack/react-query": "^5.104.1",
+    "browser-image-compression": "^2.0.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "i18next": "^26.4.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.52.0",
     "next": "16.3.8",
+    "radix-ui": "^1.6.7",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.89.0",
+    "react-i18next": "^17.0.15",
+    "react-leaflet": "^5.0.0",
+    "recharts": "^3.10.1",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/cli": "^4.3.3",
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "serve": "^14.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -1,0 +1,10 @@
+<!-- @dsCard group="Inputs" height=270 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const [v, setV] = React.useState("farmer");
+  return h(A.RoleChoiceCards, { value: v, onChange: setV });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

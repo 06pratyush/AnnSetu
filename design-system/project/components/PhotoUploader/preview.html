@@ -1,0 +1,10 @@
+<!-- @dsCard group="Inputs" height=220 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const [items, setItems] = React.useState([]);
+  return h(A.PhotoUploader, { items: items, onChange: setItems });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

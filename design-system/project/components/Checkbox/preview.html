@@ -1,0 +1,9 @@
+<!-- @dsCard group="Inputs" height=120 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.Checkbox, { id: "c1", label: "Organic", description: "Grown without chemical fertiliser or pesticide.", defaultChecked: true });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

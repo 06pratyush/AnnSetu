@@ -1,0 +1,9 @@
+<!-- @dsCard group="Orders" height=310 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.RoleScope, { role: "buyer" }, h(A.OrderTimeline, { status: "out_for_delivery", history: S.sampleOrderInTransit.status_history }));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

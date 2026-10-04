@@ -1,0 +1,11 @@
+<!-- @dsCard group="Feedback" height=300 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const [o, setO] = React.useState(true);
+  return h("div", null, h(A.Button, { variant: "secondary", onClick: function () { setO(true); } }, "Reject"),
+    h(A.ConfirmDialog, { open: o, onOpenChange: setO, title: "Reject this order?", body: "The buyer will see it as rejected, and the reserved stock goes back on sale.", confirmLabel: "Reject", cancelLabel: "Keep order", onConfirm: function () { setO(false); } }));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

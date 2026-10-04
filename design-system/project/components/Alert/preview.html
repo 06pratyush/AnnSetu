@@ -1,0 +1,12 @@
+<!-- @dsCard group="Feedback" height=230 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h("div", { className: "flex flex-col gap-3" },
+    h(A.Alert, { tone: "success" }, "Address filled from your location. Check it and correct anything that's off."),
+    h(A.Alert, { tone: "danger" }, "Tomato has only 4 kg left. Lower the quantity and try again."),
+    h(A.Alert, { tone: "accent" }, "Listing for a buyer request: Onion"));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

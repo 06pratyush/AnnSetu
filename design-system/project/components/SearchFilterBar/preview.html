@@ -1,0 +1,10 @@
+<!-- @dsCard group="Inputs" height=130 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const [q, setQ] = React.useState("tomato"); const [s, setS] = React.useState("newest"); const [o, setO] = React.useState(true);
+  return h(A.SearchFilterBar, { query: q, onQuery: setQ, sort: s, onSort: setS, organic: o, onOrganic: setO });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>
