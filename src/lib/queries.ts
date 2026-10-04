@@ -58,6 +58,12 @@ export function useOpenDemand() {
   return useQuery({ queryKey: keys.openDemand, queryFn: api.listOpenDemand, enabled: Boolean(profile) });
 }
 
+/** Open buyer requests mapped to this farm: reachable and stock-ready ones first. */
+export function useFarmerDemand() {
+  const { profile } = useAuth();
+  return useQuery({ queryKey: ["farmer-demand", profile?.id], queryFn: api.listDemandForFarmer, enabled: Boolean(profile && profile.role === "farmer") });
+}
+
 export function useMyDemand() {
   const { profile } = useAuth();
   return useQuery({ queryKey: keys.myDemand(profile?.id), queryFn: () => api.listMyDemand(profile!.id), enabled: Boolean(profile) });

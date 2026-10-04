@@ -5,8 +5,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ArrowLeft, CalendarDays, Info, SearchX, ShoppingCart } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { PageSkeleton } from "@/lib/auth/role-guard";
+import { matchListings } from "@/lib/api";
+import { useBuyerContext, useItemName } from "@/lib/matching/hooks";
 import { cart, useCart } from "@/lib/cart";
 import { useFormat } from "@/lib/i18n/format";
 import { useFarmerPublic, useListing } from "@/lib/queries";
@@ -20,6 +23,7 @@ import { ProducePhoto } from "@/components/domain/brand";
 import { PriceTag, QuantityStepper } from "@/components/domain/figures";
 import { FarmerCard } from "@/components/domain/market";
 import { OrganicBadge } from "@/components/domain/produce";
+import { FreshLine, TrustLine } from "@/components/domain/matching";
 
 function Product() {
   const { t } = useTranslation();
@@ -31,6 +35,17 @@ function Product() {
   const { profile } = useAuth();
   const listing = useListing(id);
   const farmer = useFarmerPublic(listing.data?.farmer_id ?? null);
+  const buyer = useBuyerContext();
+  const itemName = useItemName();
+  // The engine's view of this listing for this buyer: distance, freshness on arrival, trip cost.
+  const match = useQuery({
+    queryKey: ["match-one", listing.data?.item_id, buyer.lat, buyer.lng, buyer.buyerType, buyer.maxKm],
+    queryFn: () =>
+      matchListings({ itemId: listing.data!.item_id, quantity: null, lat: buyer.lat, lng: buyer.lng, buyerType: buyer.buyerType, maxKm: buyer.maxKm, state: buyer.state, district: buyer.district, category: null, organic: false, limit: 500 }),
+    enabled: Boolean(listing.data?.item_id) && buyer.ready,
+  });
+  const row = match.data?.find((r) => r.id === id) ?? null;
+  const qtyParam = Number(params.get("qty"));
   const lines = useCart();
   const inCart = lines.find((l) => l.produceId === id);
   const [photo, setPhoto] = useState(0);
@@ -39,15 +54,17 @@ function Product() {
   if (listing.isLoading) return <PageSkeleton />;
   if (!listing.data) return <EmptyState icon={SearchX} title={t("market.notFound")} action={<Button asChild><Link href="/market">{t("market.back")}</Link></Button>} />;
   const l = listing.data;
-  const quantity = qty ?? inCart?.quantity ?? l.min_order_qty;
+  const quantity = qty ?? inCart?.quantity ?? (qtyParam > 0 ? Math.min(Math.max(qtyParam, l.min_order_qty), l.qty_available) : l.min_order_qty);
+  const outOfReach = match.isSuccess && buyer.lat !== null && !row && l.status === "active";
   const soldOut = l.status !== "active" || l.qty_available <= 0;
   const own = profile?.id === l.farmer_id;
-  const canBuy = !soldOut && !own && profile?.role !== "farmer";
+  const canBuy = !soldOut && !own && profile?.role !== "farmer" && !outOfReach;
 
   function addToCart() {
     if (!profile) return;
     cart.add({
       produceId: l.id,
+      itemId: l.item_id,
       category: l.category,
       farmerId: l.farmer_id,
       farmerName: l.farmer_name,
@@ -99,10 +116,22 @@ function Product() {
               {soldOut ? <Badge tone="neutral">{t("market.soldOut")}</Badge> : null}
             </div>
             <h1 className="font-display text-h1 font-bold text-ink sm:text-[2rem]">
-              {l.name}
+              {itemName(l.item_id, l.name)}
               {l.variety ? <span className="font-body text-h3 font-normal text-ink-muted"> · {l.variety}</span> : null}
             </h1>
             <PriceTag price={l.price_per_unit} unit={l.unit} size="lg" />
+            {row ? (
+              <div className="flex flex-col gap-1">
+                <FreshLine hoursUsed={row.hours_used} shelfLifeHours={row.shelf_life_hours} harvestedAt={row.harvested_at} />
+                <TrustLine completed={row.orders_completed} onTime={row.orders_on_time} />
+                {row.distance_km !== null ? (
+                  <p className="text-small text-ink-muted">
+                    {t("matching.kmAway", { km: f.number(row.distance_km, 0) })}
+                    {buyer.buyerType === "industrial" && row.trip_cost !== null ? ` · ${t("matching.tripCost", { cost: f.money(row.trip_cost) })}` : ""}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <dl className="grid grid-cols-2 gap-4 rounded-md border border-border bg-surface p-4 text-small">
@@ -128,6 +157,7 @@ function Product() {
             ) : null}
           </dl>
 
+          {outOfReach ? <Alert tone="warning">{t("matching.outOfReach")}</Alert> : null}
           {own ? (
             <Alert tone="info">{t("market.ownListing")}</Alert>
           ) : profile?.role === "farmer" ? (

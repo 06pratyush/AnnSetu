@@ -1,0 +1,12 @@
+<!-- @dsCard group="Matching" height=620 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const W = A.DEFAULT_SETTINGS;
+  return h(A.RoleScope, { role: "buyer" }, h("div", { className: "grid max-w-2xl gap-4 sm:grid-cols-2" },
+    h(A.MatchCard, { row: S.sampleMatch, href: "#", name: "Tomato", quantity: 60, pooled: false, weights: W.wBusiness }),
+    h(A.MatchCard, { row: Object.assign({}, S.sampleMatch, { id: "m2", orders_completed: 0, orders_on_time: 0, part_trust: 0.8, distance_km: 6, trip_cost: 156, farmer_name: "Sunita Devi", farmer_verified: false }), href: "#", name: "Tomato", quantity: null, pooled: true, weights: W.wHousehold })));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

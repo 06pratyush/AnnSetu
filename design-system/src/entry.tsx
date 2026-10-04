@@ -22,6 +22,11 @@ export { StatCard, PriceTag, QuantityStepper, UnitSelect } from "@/components/do
 export { ProduceCard, ProduceRow, LedgerEntry, ProduceStatusBadge, OrganicBadge } from "@/components/domain/produce";
 export { OrderStatusBadge, OrderTimeline, OrderCard } from "@/components/domain/orders";
 export { DemandCard, SuggestionPanel, TopRequested } from "@/components/domain/demand";
+export { ItemPicker } from "@/components/domain/item-picker";
+export { MatchCard, HiddenNote, BatchProgress, TrustLine, FreshLine, ScoreBreakdown } from "@/components/domain/matching";
+export { SEED_CATALOGUE } from "@/lib/matching/catalogue-data";
+export { indexCatalogue } from "@/lib/matching/search";
+export { DEFAULT_SETTINGS } from "@/lib/matching/settings";
 export { CategoryChips, SearchFilterBar, FarmerCard, RatingStars } from "@/components/domain/market";
 export { CartLine, CartSummary } from "@/components/domain/cart";
 export { RoleChoiceCards, LanguageToggle, ThemeToggle } from "@/components/domain/choices";

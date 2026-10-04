@@ -58,6 +58,7 @@ export function SearchFilterBar({
   onSort,
   organic,
   onOrganic,
+  sortLabels,
   className,
 }: {
   query: string;
@@ -66,6 +67,8 @@ export function SearchFilterBar({
   onSort: (s: MarketSort) => void;
   organic: boolean;
   onOrganic: (v: boolean) => void;
+  /** Override option labels, e.g. "Best match" for the engine's own order. */
+  sortLabels?: Partial<Record<MarketSort, string>>;
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -106,9 +109,9 @@ export function SearchFilterBar({
           {t("market.organicOnly")}
         </button>
         <NativeSelect aria-label={t("market.sort")} value={sort} onChange={(e) => onSort(e.target.value as MarketSort)} className="min-w-0 flex-1 sm:w-56">
-          <option value="newest">{t("market.sortNewest")}</option>
-          <option value="price_asc">{t("market.sortPriceLow")}</option>
-          <option value="price_desc">{t("market.sortPriceHigh")}</option>
+          <option value="newest">{sortLabels?.newest ?? t("market.sortNewest")}</option>
+          <option value="price_asc">{sortLabels?.price_asc ?? t("market.sortPriceLow")}</option>
+          <option value="price_desc">{sortLabels?.price_desc ?? t("market.sortPriceHigh")}</option>
         </NativeSelect>
       </div>
     </div>

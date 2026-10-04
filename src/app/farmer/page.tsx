@@ -6,8 +6,8 @@ import { ChartColumn, ClipboardList, HandCoins, Inbox, Plus, Table2, Warehouse, 
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useFormat } from "@/lib/i18n/format";
-import { useFarmerOrders, useMyProduce } from "@/lib/queries";
-import { useFarmerSuggestions } from "@/lib/recommend/hooks";
+import { useFarmerOrders, useMyProduce, useFarmerDemand } from "@/lib/queries";
+import { useItemName } from "@/lib/matching/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/misc";
@@ -35,7 +35,8 @@ export default function FarmerDashboard() {
   const { profile } = useAuth();
   const produce = useMyProduce();
   const orders = useFarmerOrders();
-  const suggestions = useFarmerSuggestions();
+  const demand = useFarmerDemand();
+  const itemName = useItemName();
   const [stockView, setStockView] = useState<"chart" | "table">("chart");
   const [revenueView, setRevenueView] = useState<"chart" | "table">("chart");
 
@@ -128,9 +129,10 @@ export default function FarmerDashboard() {
 
         <div className="flex min-w-0 flex-col gap-6">
           <SuggestionPanel
-            suggestions={suggestions.data ?? []}
-            loading={suggestions.isLoading}
-            listHref={(s) => (s.demand ? `/farmer/produce/new?demand=${s.demand.id}` : undefined)}
+            demand={demand.data ?? []}
+            loading={demand.isLoading}
+            nameOf={(d) => itemName((d as { item_id?: string | null }).item_id, d.item_name)}
+            listHref={(d) => `/farmer/produce/new?demand=${d.id}`}
             seeAllHref="/farmer/suggestions"
           />
 

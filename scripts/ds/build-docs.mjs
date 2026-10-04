@@ -20,7 +20,7 @@ import type * as React from "react";
 
 export type Unit = "kg" | "quintal" | "tonne" | "dozen" | "piece" | "litre" | "bunch";
 export type CategorySlug = "vegetables" | "fruits" | "grains" | "pulses" | "spices" | "dairy" | "oilseeds" | "others";
-export type OrderStatus = "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
+export type OrderStatus = "pooling" | "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
 
 export interface Produce {
   id: string; farmer_id: string; category: CategorySlug; name: string; variety: string | null; description: string | null;

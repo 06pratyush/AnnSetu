@@ -3,7 +3,7 @@ import type * as React from "react";
 
 export type Unit = "kg" | "quintal" | "tonne" | "dozen" | "piece" | "litre" | "bunch";
 export type CategorySlug = "vegetables" | "fruits" | "grains" | "pulses" | "spices" | "dairy" | "oilseeds" | "others";
-export type OrderStatus = "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
+export type OrderStatus = "pooling" | "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
 
 export interface Produce {
   id: string; farmer_id: string; category: CategorySlug; name: string; variety: string | null; description: string | null;
@@ -171,10 +171,54 @@ export interface OrderTimelineProps { status: OrderStatus; history: { status: Or
 
 export interface OrderCardProps { order: Order; perspective: "farmer" | "buyer"; onAction?(s: OrderStatus): void; busyStatus?: OrderStatus | null; footer?: React.ReactNode }
 
-export interface DemandCardProps { demand: OpenDemand; listHref?: string; reason?: string; compact?: boolean }
+export interface CatalogueItem { id: string; category: string; nameEn: string; nameHi: string; baseUnit: "kg" | "litre" | "piece" | "dozen"; shelfLifeHours: number; names: string[] }
+export interface ItemPickerProps {
+  index: unknown; // indexCatalogue(SEED_CATALOGUE)
+  value: CatalogueItem | null;
+  onChange(item: CatalogueItem | null): void;
+  id?: string;
+  /** Lowest closeness offered, 0-1. Default 0.55. */
+  cutoff?: number;
+  placeholder?: string;
+}
 
-export interface Suggestion { id: string; kind: "demand"; demand?: OpenDemand; score?: number; reason?: string }
-export interface SuggestionPanelProps { suggestions: Suggestion[]; listHref(s: Suggestion): string | undefined; seeAllHref?: string; limit?: number; loading?: boolean }
+export interface MatchCardProps {
+  row: MarketListing & { distance_km: number | null; travel_hours: number | null; hours_used: number; shelf_life_hours: number; price_base: number;
+    shop_price: number | null; trip_cost: number | null; part_price: number; part_fresh: number; part_near: number; part_trust: number; part_fill: number; score: number;
+    farmer_verified: boolean; orders_completed: number; orders_on_time: number; harvested_at: string };
+  href: string;
+  /** Item name in the UI language. */
+  name: string;
+  /** The buyer's wanted quantity in the listing's unit, when known. */
+  quantity: number | null;
+  /** Households share delivery; businesses pay one trip. */
+  pooled: boolean;
+  weights: { price: number; fresh: number; near: number; trust: number; fill: number };
+}
+
+export type HiddenReason = "unverified" | "no_location" | "too_far" | "below_min_order" | "not_enough_stock" | "not_fresh_on_arrival" | "hidden_in_area";
+export interface HiddenNoteProps { hidden: { reason: HiddenReason; listings: number }[] }
+
+export interface BatchProgressProps {
+  batch: { room: number; trip_cost: number; load_qty: number; cutoff_at: string; status: "open" | "released" | "accepted" | "rejected" | "delivered" | "cancelled"; below_break_even: boolean };
+}
+
+export interface DemandCardProps {
+  demand: OpenDemand & { distance_km?: number | null; can_reach?: boolean; ready?: boolean; listing_available?: number | null; listing_unit?: Unit | null };
+  listHref?: string;
+  /** Item name in the UI language. */
+  name?: string;
+  compact?: boolean;
+}
+
+export interface SuggestionPanelProps {
+  demand: DemandCardProps["demand"][];
+  listHref(d: DemandCardProps["demand"]): string | undefined;
+  nameOf?(d: DemandCardProps["demand"]): string;
+  seeAllHref?: string;
+  limit?: number;
+  loading?: boolean;
+}
 
 export interface BrandMarkProps { compact?: boolean; className?: string }
 

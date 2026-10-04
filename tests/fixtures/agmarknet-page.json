@@ -1,0 +1,21 @@
+{
+  "note": "Illustrative records in the shape api.data.gov.in returns for resource 9ef84268-d588-465a-a308-a864a43d0070. Not real prices.",
+  "status": "ok",
+  "total": 13,
+  "count": 13,
+  "records": [
+    { "state": "Rajasthan", "district": "Jaipur", "market": "Jaipur (F&V)", "commodity": "Tomato", "variety": "Local", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "1200", "max_price": "1800", "modal_price": "1500" },
+    { "state": "Rajasthan", "district": "Jaipur", "market": "Chomu", "commodity": "Tomato", "variety": "Hybrid", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "1400", "max_price": "1900", "modal_price": "1700" },
+    { "state": "Rajasthan", "district": "Jaipur", "market": "Chomu", "commodity": "Tomato", "variety": "Hybrid", "grade": "FAQ", "arrival_date": "03/10/2026", "min_price": "2600", "max_price": "3000", "modal_price": "2800" },
+    { "state": "Rajasthan", "district": "Ajmer", "market": "Kishangarh", "commodity": "Tomato", "variety": "Local", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "1800", "max_price": "2200", "modal_price": "2000" },
+    { "state": "Maharashtra", "district": "Pune", "market": "Pune", "commodity": "Tomato", "variety": "Local", "grade": "FAQ", "arrival_date": "04/10/2026", "min_price": "900", "max_price": "1400", "modal_price": "1100" },
+    { "state": "Maharashtra", "district": "Pune", "market": "Pune", "commodity": "Bhindi(Ladies Finger)", "variety": "Bhindi", "grade": "FAQ", "arrival_date": "04/10/2026", "min_price": "2500", "max_price": "3500", "modal_price": "3000" },
+    { "State": "Chattisgarh", "District": "Raipur", "Market": "Raipur", "Commodity": "Cucumbar(Kheera)", "Variety": "Other", "Grade": "FAQ", "Arrival_Date": "05/10/2026", "Min_x0020_Price": "1000", "Max_x0020_Price": "1400", "Modal_x0020_Price": "1,200" },
+    { "state": "Uttar Pradesh", "district": "Agra", "market": "Agra", "commodity": "Onion", "variety": "Red", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "1800", "max_price": "2400", "modal_price": "2100" },
+    { "state": "Uttar Pradesh", "district": "Agra", "market": "Agra", "commodity": "Marigold(Calcutta)", "variety": "Other", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "3000", "max_price": "5000", "modal_price": "4000" },
+    { "state": "Uttar Pradesh", "district": "Agra", "market": "Achnera", "commodity": "Onion", "variety": "Red", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "0", "max_price": "0", "modal_price": "0" },
+    { "state": "Uttar Pradesh", "district": "Agra", "market": "Fatehabad", "commodity": "Onion", "variety": "Red", "grade": "FAQ", "arrival_date": "31/02/2026", "min_price": "1900", "max_price": "2300", "modal_price": "2200" },
+    { "state": "Uttar Pradesh", "district": "Agra", "market": "Fatehpur Sikri", "commodity": "Onion", "variety": "Red", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "1900", "max_price": "2300", "modal_price": "2500000" },
+    { "state": "Punjab", "district": "Ludhiana", "market": "Khanna", "commodity": "Wheat", "variety": "Dara", "grade": "FAQ", "arrival_date": "05/10/2026", "min_price": "2425", "max_price": "2425", "modal_price": "2425" }
+  ]
+}

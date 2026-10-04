@@ -1,0 +1,31 @@
+name: Mandi prices
+
+# Once a day: Agmarknet mandi prices (data.gov.in) into Supabase, for the rate suggestion and the
+# price part of the match score. Needs three repository secrets (Settings → Secrets and variables
+# → Actions): DATA_GOV_IN_API_KEY, SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL (or the
+# URL as a variable). Without them the job does nothing and says why.
+on:
+  schedule:
+    - cron: "45 12 * * *" # 18:15 IST, after most markets have reported
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Fetch Agmarknet prices into Supabase
+        run: node scripts/prices/fetch-mandi-prices.mjs
+        env:
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

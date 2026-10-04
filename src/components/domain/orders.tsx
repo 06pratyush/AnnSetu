@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CircleCheck, CircleX, Clock, MapPin, Package, PackageCheck, Phone, Truck, type LucideIcon } from "lucide-react";
+import { Ban, CalendarClock, CircleCheck, CircleX, Clock, MapPin, Package, PackageCheck, Phone, Truck, Users, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useFormat } from "@/lib/i18n/format";
 import type { Order, OrderStatus, StatusEvent } from "@/lib/types";
@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
+import { BatchProgress } from "./matching";
 
 type Tone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
 
 export const ORDER_STATUS_META: Record<OrderStatus, { icon: LucideIcon; tone: Tone }> = {
+  pooling: { icon: Users, tone: "accent" },
   placed: { icon: Clock, tone: "info" },
   accepted: { icon: CircleCheck, tone: "role" },
   packed: { icon: Package, tone: "role" },
@@ -41,7 +43,8 @@ export function OrderTimeline({ status, history }: { status: OrderStatus; histor
   const at = (s: OrderStatus) => history.find((h) => h.status === s)?.at;
   const terminal = status === "rejected" || status === "cancelled";
   const reached = new Set(history.map((h) => h.status));
-  const steps: OrderStatus[] = terminal ? [...HAPPY_PATH.filter((s) => reached.has(s)), status] : HAPPY_PATH;
+  const path: OrderStatus[] = reached.has("pooling") ? ["pooling", ...HAPPY_PATH] : HAPPY_PATH;
+  const steps: OrderStatus[] = terminal ? [...path.filter((s) => reached.has(s)), status] : path;
   const currentIndex = steps.indexOf(status);
 
   return (
@@ -82,7 +85,7 @@ export type OrderAction = { status: OrderStatus; label: string; tone: "primary" 
 /** The next steps each side may take; mirrors the transitions the database allows. */
 export function nextActions(order: Pick<Order, "status">, perspective: "farmer" | "buyer", t: (k: string) => string): OrderAction[] {
   if (perspective === "buyer") {
-    return order.status === "placed" || order.status === "accepted"
+    return order.status === "pooling" || order.status === "placed" || order.status === "accepted"
       ? [{ status: "cancelled", label: t("orders.cancel"), tone: "danger" }]
       : [];
   }
@@ -157,13 +160,34 @@ export function OrderCard({
               <span className="font-semibold text-ink tabular-nums">{f.money(it.quantity * it.unit_price)}</span>
             </li>
           ))}
+          <li className="flex items-baseline justify-between gap-3 text-body">
+            <span className="min-w-0 text-ink">
+              {t("orders.delivery")}
+              {order.distance_km ? <span className="text-ink-muted"> · {t("matching.kmAway", { km: f.number(order.distance_km, 0) })}</span> : null}
+            </span>
+            <span className="text-ink tabular-nums">{order.status === "pooling" ? t("orders.deliveryPending") : f.money(order.delivery_fee)}</span>
+          </li>
           <li className="mt-1 flex items-baseline justify-between gap-3 border-t border-border pt-2 text-body">
             <span className="font-semibold text-ink">
               {t("common.total")} <span className="font-normal text-ink-muted">· {t("orders.cod")}</span>
             </span>
-            <span className="font-display text-h3 font-semibold text-ink tabular-nums">{f.money(order.total)}</span>
+            <span className="font-display text-h3 font-semibold text-ink tabular-nums">{f.money(order.total + (order.delivery_fee ?? 0))}</span>
           </li>
         </ul>
+
+        {order.status === "pooling" && order.batch ? (
+          <div className="flex flex-col gap-1.5 rounded-sm bg-haldi-soft p-3">
+            <p className="text-small font-semibold text-haldi-ink">{t("orders.poolingTitle")}</p>
+            <BatchProgress batch={order.batch} />
+          </div>
+        ) : null}
+
+        {order.deliver_by && ["accepted", "packed", "out_for_delivery"].includes(order.status) ? (
+          <p className="flex items-center gap-2 text-small text-ink">
+            <CalendarClock className="size-4 text-ink-muted" aria-hidden />
+            {t("orders.promisedBy", { when: f.dateTime(order.deliver_by) })}
+          </p>
+        ) : null}
 
         {perspective === "farmer" ? (
           <div className="flex flex-col gap-1 rounded-sm bg-sunken p-3 text-small">

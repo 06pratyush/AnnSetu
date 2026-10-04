@@ -10,7 +10,11 @@ import { createDemand, setDemandStatus } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { useFormat } from "@/lib/i18n/format";
 import { keys, useMyDemand } from "@/lib/queries";
-import { CATEGORY_SLUGS, type CategorySlug, type DemandRequest, type DemandStatus, type Unit } from "@/lib/types";
+import { type CategorySlug, type DemandRequest, type DemandStatus, type Unit } from "@/lib/types";
+import { useCatalogue, useEngineSettings, useItemName } from "@/lib/matching/hooks";
+import type { CatalogueItem } from "@/lib/matching/search";
+import { unitsFor } from "@/lib/matching/units";
+import { ItemPicker } from "@/components/domain/item-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -21,17 +25,19 @@ import { toast } from "@/components/ui/toaster";
 import { PageHeader } from "@/components/layout/app-shell";
 import { CategoryIcon } from "@/components/domain/brand";
 import { EmptyState } from "@/components/domain/empty-state";
-import { UnitSelect } from "@/components/domain/figures";
 
 function RequirementForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
   const f = useFormat();
   const qc = useQueryClient();
   const { profile } = useAuth();
-  const [item, setItem] = useState("");
-  const [category, setCategory] = useState<CategorySlug>("vegetables");
+  const { index } = useCatalogue();
+  const settings = useEngineSettings();
+  const [item, setItem] = useState<CatalogueItem | null>(null);
   const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState<Unit>("kg");
+  const [unitChoice, setUnit] = useState<Unit>("kg");
+  const units = item ? unitsFor(item.baseUnit) : (["kg", "quintal", "tonne"] as Unit[]);
+  const unit = units.includes(unitChoice) ? unitChoice : units[0];
   const [price, setPrice] = useState("");
   const [neededBy, setNeededBy] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,16 +49,17 @@ function RequirementForm({ onDone }: { onDone: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    if (!item.trim()) next.item = t("errors.required");
+    if (!item) next.item = t("errors.required");
     if (!qty || Number(qty) <= 0) next.qty = t("errors.positive");
     if (price && Number(price) <= 0) next.price = t("errors.positive");
     setErrors(next);
-    if (Object.keys(next).length) return;
+    if (Object.keys(next).length || !item) return;
     setBusy(true);
     try {
       await createDemand({
-        category,
-        item_name: item.trim(),
+        item_id: item.id,
+        category: item.category as CategorySlug,
+        item_name: item.nameEn,
         quantity: Number(qty),
         unit,
         target_price: price ? Number(price) : null,
@@ -73,23 +80,20 @@ function RequirementForm({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       {formError ? <Alert tone="danger">{formError}</Alert> : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="r-item" label={t("requirements.item")} error={errors.item}>
-          <Input value={item} onChange={(e) => setItem(e.target.value)} placeholder={t("requirements.itemPlaceholder")} maxLength={80} />
-        </Field>
-        <Field id="r-category" label={t("produce.category")}>
-          <NativeSelect value={category} onChange={(e) => setCategory(e.target.value as CategorySlug)}>
-            {CATEGORY_SLUGS.map((c) => (
-              <option key={c} value={c}>
-                {t(`categories.${c}`)}
-              </option>
-            ))}
-          </NativeSelect>
+        <Field id="r-item" label={t("requirements.item")} hint={t("produce.itemHint")} error={errors.item} className="sm:col-span-2">
+          <ItemPicker index={index} value={item} onChange={setItem} placeholder={t("requirements.itemPlaceholder")} cutoff={settings.searchCutoff} />
         </Field>
         <Field id="r-qty" label={t("common.quantity")} error={errors.qty}>
           <UnitInput unit={f.unit(unit)} value={qty} onChange={(e) => setQty(e.target.value)} min={0} step="any" />
         </Field>
         <Field id="r-unit" label={t("produce.unit")}>
-          <UnitSelect value={unit} onChange={(e) => setUnit(e.target.value as Unit)} />
+          <NativeSelect value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+            {units.map((u) => (
+              <option key={u} value={u}>
+                {t(`unitsLong.${u}`)}
+              </option>
+            ))}
+          </NativeSelect>
         </Field>
         <Field id="r-price" label={t("requirements.targetPrice", { unit: f.unit(unit) })} optional={t("common.optional")} error={errors.price}>
           <UnitInput unit={`₹/${f.unit(unit)}`} value={price} onChange={(e) => setPrice(e.target.value)} min={0} step="any" />
@@ -111,6 +115,7 @@ function RequirementForm({ onDone }: { onDone: () => void }) {
 function RequirementRow({ d }: { d: DemandRequest }) {
   const { t } = useTranslation();
   const f = useFormat();
+  const itemName = useItemName();
   const qc = useQueryClient();
   const { profile } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -134,7 +139,7 @@ function RequirementRow({ d }: { d: DemandRequest }) {
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-h3 font-semibold text-ink">{d.item_name}</h3>
+            <h3 className="font-display text-h3 font-semibold text-ink">{itemName(d.item_id, d.item_name)}</h3>
             <Badge tone={tone}>{t(`requirements.status.${d.status}`)}</Badge>
           </div>
           <p className="text-body text-ink tabular-nums">

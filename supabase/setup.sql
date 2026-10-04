@@ -12,7 +12,8 @@ create type public.consumer_type as enum ('individual', 'industrial');
 create type public.unit as enum ('kg', 'quintal', 'tonne', 'dozen', 'piece', 'litre', 'bunch');
 create type public.produce_category as enum ('vegetables', 'fruits', 'grains', 'pulses', 'spices', 'dairy', 'oilseeds', 'others');
 create type public.produce_status as enum ('active', 'paused', 'sold_out', 'archived');
-create type public.order_status as enum ('placed', 'accepted', 'rejected', 'packed', 'out_for_delivery', 'delivered', 'cancelled');
+-- 'pooling': a household order waiting in a delivery batch until the trip pays for itself.
+create type public.order_status as enum ('pooling', 'placed', 'accepted', 'rejected', 'packed', 'out_for_delivery', 'delivered', 'cancelled');
 create type public.ledger_type as enum ('listed', 'restocked', 'reserved', 'released', 'sold', 'spoiled', 'adjusted');
 create type public.demand_status as enum ('open', 'fulfilled', 'closed');
 create type public.business_type as enum ('restaurant', 'retailer', 'wholesaler', 'processor', 'institution', 'other');
@@ -893,3 +894,1959 @@ begin
   end if;
 end;
 $$;
+
+-- ===== 20261005000001_matching_schema.sql =====
+
+-- Matching engine, part 1: what the five algorithms need stored.
+--   items + item_names     the catalogue every listing and request points at (search, shelf life)
+--   engine_settings        every number the engine uses, editable without code
+--   area_rules             hide an item, or shift its expected demand, by area and date
+--   reference_prices       today's mandi and shop price per item and area (live feed + manual)
+--   delivery_batches       household orders pooled into one trip until it pays for itself
+-- plus the new columns on farmers, buyers, listings, requests and orders.
+
+create table public.items (
+  id text primary key check (id ~ '^[a-z0-9-]{2,40}$'),
+  category public.produce_category not null,
+  name_en text not null,
+  name_hi text not null,
+  base_unit text not null check (base_unit in ('kg', 'litre', 'piece', 'dozen')),
+  shelf_life_hours integer not null check (shelf_life_hours > 0),
+  agmarknet_names text[] not null default '{}',
+  sort integer not null default 0,
+  active boolean not null default true
+);
+
+-- Every spelling a buyer or farmer might type, in English, Hindi in Latin letters and Hindi script.
+create table public.item_names (
+  item_id text not null references public.items (id) on delete cascade,
+  name text not null,
+  primary key (item_id, name)
+);
+
+-- One row. Each value is the design default; change it here and the engine follows.
+create table public.engine_settings (
+  id boolean primary key default true check (id),
+  road_factor numeric not null default 1.3 check (road_factor >= 1),
+  speed_kmph numeric not null default 30 check (speed_kmph > 0),
+  freshness_limit numeric not null default 0.6 check (freshness_limit > 0 and freshness_limit <= 1),
+  cost_per_road_km numeric not null default 10 check (cost_per_road_km >= 0),
+  farmer_share numeric not null default 0.5 check (farmer_share between 0 and 1),
+  nudge_cap numeric not null default 0.25 check (nudge_cap between 0 and 1),
+  nudge_min_requests integer not null default 20 check (nudge_min_requests >= 0),
+  lot_cut_per_100 numeric not null default 0.05 check (lot_cut_per_100 >= 0),
+  lot_cut_max numeric not null default 0.05 check (lot_cut_max between 0 and 0.5),
+  trust_prior_on_time numeric not null default 8 check (trust_prior_on_time >= 0),
+  trust_prior_total numeric not null default 10 check (trust_prior_total > 0),
+  w_household jsonb not null default '{"price": 0.30, "fresh": 0.30, "near": 0.20, "trust": 0.20, "fill": 0}',
+  w_business jsonb not null default '{"price": 0.35, "fresh": 0.10, "near": 0.05, "trust": 0.30, "fill": 0.20}',
+  household_max_km numeric not null default 25 check (household_max_km > 0),
+  business_max_km numeric not null default 100 check (business_max_km > 0),
+  farmer_radius_km numeric not null default 40 check (farmer_radius_km > 0),
+  require_verified boolean not null default false,
+  batch_window_hours numeric not null default 24 check (batch_window_hours > 0),
+  fallback_break_even_kg numeric not null default 20 check (fallback_break_even_kg > 0),
+  -- Shop price estimate = mandi x markup when no shop price is known. Vegetables, fruits and pulses
+  -- follow the RBI farmers'-share studies (2024); the other categories are estimates to replace.
+  shop_markup jsonb not null default '{"vegetables": 3.0, "fruits": 2.7, "grains": 1.5, "pulses": 1.4, "spices": 1.8, "oilseeds": 1.5, "dairy": 1.35, "others": 2.0}',
+  search_cutoff numeric not null default 0.55 check (search_cutoff between 0 and 1),
+  updated_at timestamptz not null default now()
+);
+insert into public.engine_settings default values;
+
+-- Admin-set rules for an area and a date range. Never about a person: an area, an item or category, dates.
+create table public.area_rules (
+  id uuid primary key default gen_random_uuid(),
+  state text,
+  district text,
+  item_id text references public.items (id) on delete cascade,
+  category public.produce_category,
+  starts_on date not null,
+  ends_on date not null,
+  action text not null check (action in ('hide', 'demand')),
+  demand_multiplier numeric check (demand_multiplier > 0),
+  note text check (char_length(note) <= 300),
+  constraint area_rule_target check (item_id is not null or category is not null),
+  constraint area_rule_dates check (ends_on >= starts_on),
+  constraint area_rule_multiplier check ((action = 'demand') = (demand_multiplier is not null)),
+  constraint area_rule_place check (district is null or state is not null)
+);
+
+-- Prices per item base unit (kg, litre, piece). state/district '' = national / state-wide.
+create table public.reference_prices (
+  item_id text not null references public.items (id) on delete cascade,
+  state text not null default '',
+  district text not null default '',
+  source text not null check (source in ('manual', 'agmarknet', 'sample')),
+  price_date date not null,
+  mandi_price numeric(12, 2) check (mandi_price > 0),
+  shop_price numeric(12, 2) check (shop_price > 0),
+  markets integer,
+  fetched_at timestamptz not null default now(),
+  primary key (item_id, state, district, source),
+  constraint reference_price_some check (mandi_price is not null or shop_price is not null)
+);
+
+alter table public.farmer_details
+  add column verified boolean not null default false,
+  add column delivery_radius_km numeric(6, 1) check (delivery_radius_km > 0),
+  add column orders_completed integer not null default 0 check (orders_completed >= 0),
+  add column orders_on_time integer not null default 0 check (orders_on_time >= 0);
+
+alter table public.buyer_details
+  add column max_distance_km numeric(6, 1) check (max_distance_km > 0);
+
+alter table public.produce
+  add column item_id text not null references public.items (id),
+  add column harvested_at timestamptz not null default now(),
+  add column delivery_radius_km numeric(6, 1) check (delivery_radius_km > 0);
+create index produce_match_idx on public.produce (item_id, status) include (lat, lng);
+create index produce_active_geo_idx on public.produce (lat, lng) where status = 'active';
+
+alter table public.demand_requests
+  add column item_id text references public.items (id);
+create index demand_item_idx on public.demand_requests (item_id, status);
+
+-- A trip from one farm to one PIN code, collecting household orders until it pays for itself.
+create table public.delivery_batches (
+  id uuid primary key default gen_random_uuid(),
+  farmer_id uuid not null references public.profiles (id) on delete cascade,
+  pincode text not null check (pincode ~ '^[0-9]{6}$'),
+  drop_lat double precision,
+  drop_lng double precision,
+  distance_km numeric(8, 2),
+  trip_cost numeric(12, 2) not null default 0,
+  status text not null default 'open' check (status in ('open', 'released', 'cancelled')),
+  -- Load and savings (shop - mandi) of the orders in the batch; it releases when room >= trip_cost.
+  load_qty numeric(14, 2) not null default 0,
+  room numeric(14, 2) not null default 0,
+  below_break_even boolean not null default false,
+  opened_at timestamptz not null default now(),
+  cutoff_at timestamptz not null,
+  released_at timestamptz
+);
+-- At most one open batch per farm and PIN code; place_order relies on this to pool orders.
+create unique index batches_open_idx on public.delivery_batches (farmer_id, pincode) where status = 'open';
+create index batches_cutoff_idx on public.delivery_batches (cutoff_at) where status = 'open';
+
+alter table public.orders
+  add column batch_id uuid references public.delivery_batches (id) on delete set null,
+  add column delivery_fee numeric(12, 2) not null default 0,
+  add column distance_km numeric(8, 2),
+  add column deliver_by timestamptz;
+create index orders_batch_idx on public.orders (batch_id);
+
+-- Views now carry the item, harvest time and the farmer's record (columns appended at the end).
+create or replace view public.market_listings as
+select
+  p.id, p.farmer_id, p.category, p.name, p.variety, p.description, p.unit, p.price_per_unit,
+  p.qty_available, p.min_order_qty, p.harvest_date, p.best_before, p.is_organic, p.images, p.status,
+  p.district, p.state,
+  round(p.lat::numeric, 2)::float8 as approx_lat,
+  round(p.lng::numeric, 2)::float8 as approx_lng,
+  p.created_at,
+  pr.full_name as farmer_name,
+  fd.farm_name,
+  pr.avatar_url as farmer_avatar,
+  r.avg_rating as farmer_rating,
+  coalesce(r.ratings_count, 0) as farmer_ratings_count,
+  p.item_id,
+  p.harvested_at,
+  fd.verified as farmer_verified,
+  fd.orders_completed,
+  fd.orders_on_time
+from public.produce p
+join public.profiles pr on pr.id = p.farmer_id
+left join public.farmer_details fd on fd.user_id = p.farmer_id
+left join public.farmer_ratings r on r.farmer_id = p.farmer_id
+where p.status in ('active', 'sold_out');
+
+create or replace view public.farmer_public as
+select
+  pr.id, pr.full_name, pr.avatar_url,
+  fd.farm_name, fd.farm_size_acres, fd.main_crops,
+  a.district, a.state,
+  r.avg_rating,
+  coalesce(r.ratings_count, 0) as ratings_count,
+  pr.created_at as member_since,
+  fd.verified,
+  fd.orders_completed,
+  fd.orders_on_time
+from public.profiles pr
+left join public.farmer_details fd on fd.user_id = pr.id
+left join public.addresses a on a.user_id = pr.id and a.is_default
+left join public.farmer_ratings r on r.farmer_id = pr.id
+where pr.role = 'farmer' and pr.onboarded;
+
+create or replace view public.open_demand as
+select
+  d.id, d.buyer_id, d.category, d.item_name, d.quantity, d.unit, d.target_price, d.needed_by, d.notes,
+  d.district, d.state, d.status, d.created_at,
+  pr.consumer_type as buyer_type,
+  case
+    when pr.consumer_type = 'industrial' then coalesce(nullif(trim(bd.business_name), ''), split_part(pr.full_name, ' ', 1))
+    else split_part(pr.full_name, ' ', 1)
+  end as buyer_label,
+  round(d.lat::numeric, 2)::float8 as approx_lat,
+  round(d.lng::numeric, 2)::float8 as approx_lng,
+  d.item_id
+from public.demand_requests d
+join public.profiles pr on pr.id = d.buyer_id
+left join public.buyer_details bd on bd.user_id = d.buyer_id
+where d.status = 'open' and (d.needed_by is null or d.needed_by >= current_date);
+
+-- ===== 20261005000002_catalogue_seed.sql =====
+
+-- Item catalogue and sample prices. Generated from supabase/catalogue.json by scripts/build-catalogue-sql.mjs.
+-- Shelf lives are rough estimates for ambient storage; replace them with published storage tables.
+
+insert into public.items (id, category, name_en, name_hi, base_unit, shelf_life_hours, agmarknet_names, sort) values
+  ('tomato', 'vegetables', 'Tomato', 'टमाटर', 'kg', 120, array['Tomato'], 0),
+  ('potato', 'vegetables', 'Potato', 'आलू', 'kg', 2160, array['Potato'], 1),
+  ('onion', 'vegetables', 'Onion', 'प्याज', 'kg', 1440, array['Onion'], 2),
+  ('spinach', 'vegetables', 'Spinach', 'पालक', 'kg', 24, array['Spinach'], 3),
+  ('cauliflower', 'vegetables', 'Cauliflower', 'फूलगोभी', 'kg', 96, array['Cauliflower'], 4),
+  ('cabbage', 'vegetables', 'Cabbage', 'पत्ता गोभी', 'kg', 336, array['Cabbage'], 5),
+  ('brinjal', 'vegetables', 'Brinjal', 'बैंगन', 'kg', 96, array['Brinjal'], 6),
+  ('okra', 'vegetables', 'Okra (Lady finger)', 'भिंडी', 'kg', 72, array['Bhindi(Ladies Finger)'], 7),
+  ('carrot', 'vegetables', 'Carrot', 'गाजर', 'kg', 336, array['Carrot'], 8),
+  ('green-chilli', 'vegetables', 'Green chilli', 'हरी मिर्च', 'kg', 120, array['Green Chilli'], 9),
+  ('capsicum', 'vegetables', 'Capsicum', 'शिमला मिर्च', 'kg', 168, array['Capsicum'], 10),
+  ('cucumber', 'vegetables', 'Cucumber', 'खीरा', 'kg', 120, array['Cucumbar(Kheera)', 'Cucumber(Kheera)'], 11),
+  ('bottle-gourd', 'vegetables', 'Bottle gourd', 'लौकी', 'kg', 168, array['Bottle gourd'], 12),
+  ('bitter-gourd', 'vegetables', 'Bitter gourd', 'करेला', 'kg', 96, array['Bitter gourd'], 13),
+  ('ridge-gourd', 'vegetables', 'Ridge gourd', 'तोरई', 'kg', 96, array['Ridgeguard(Tori)', 'Ridge gourd(Tori)'], 14),
+  ('pumpkin', 'vegetables', 'Pumpkin', 'कद्दू', 'kg', 1440, array['Pumpkin'], 15),
+  ('radish', 'vegetables', 'Radish', 'मूली', 'kg', 120, array['Raddish', 'Radish'], 16),
+  ('green-peas', 'vegetables', 'Green peas', 'मटर', 'kg', 72, array['Peas Wet', 'Green Peas'], 17),
+  ('beans', 'vegetables', 'French beans', 'बीन्स', 'kg', 96, array['Beans', 'French Beans (Frasbean)'], 18),
+  ('coriander-leaves', 'vegetables', 'Coriander leaves', 'हरा धनिया', 'kg', 48, array['Coriander(Leaves)'], 19),
+  ('methi-leaves', 'vegetables', 'Fenugreek leaves', 'मेथी', 'kg', 36, array['Methi(Leaves)'], 20),
+  ('garlic', 'vegetables', 'Garlic', 'लहसुन', 'kg', 2160, array['Garlic'], 21),
+  ('ginger', 'vegetables', 'Ginger', 'अदरक', 'kg', 720, array['Ginger(Green)'], 22),
+  ('sweet-potato', 'vegetables', 'Sweet potato', 'शकरकंद', 'kg', 720, array['Sweet Potato'], 23),
+  ('drumstick', 'vegetables', 'Drumstick', 'सहजन', 'kg', 96, array['Drumstick'], 24),
+  ('beetroot', 'vegetables', 'Beetroot', 'चुकंदर', 'kg', 336, array['Beetroot'], 25),
+  ('spring-onion', 'vegetables', 'Spring onion', 'हरा प्याज', 'kg', 48, array['Onion Green'], 26),
+  ('other-vegetable', 'vegetables', 'Other vegetable', 'अन्य सब्ज़ी', 'kg', 96, '{}'::text[], 27),
+  ('banana', 'fruits', 'Banana', 'केला', 'kg', 120, array['Banana', 'Banana - Green'], 28),
+  ('mango', 'fruits', 'Mango', 'आम', 'kg', 168, array['Mango', 'Mango (Raw-Ripe)'], 29),
+  ('apple', 'fruits', 'Apple', 'सेब', 'kg', 720, array['Apple'], 30),
+  ('grapes', 'fruits', 'Grapes', 'अंगूर', 'kg', 120, array['Grapes'], 31),
+  ('papaya', 'fruits', 'Papaya', 'पपीता', 'kg', 120, array['Papaya', 'Papaya (Raw)'], 32),
+  ('guava', 'fruits', 'Guava', 'अमरूद', 'kg', 96, array['Guava'], 33),
+  ('pomegranate', 'fruits', 'Pomegranate', 'अनार', 'kg', 720, array['Pomegranate'], 34),
+  ('orange', 'fruits', 'Orange', 'संतरा', 'kg', 336, array['Orange'], 35),
+  ('lemon', 'fruits', 'Lemon', 'नींबू', 'kg', 336, array['Lemon', 'Lime'], 36),
+  ('watermelon', 'fruits', 'Watermelon', 'तरबूज', 'kg', 336, array['Water Melon'], 37),
+  ('muskmelon', 'fruits', 'Muskmelon', 'खरबूजा', 'kg', 120, array['Karbuja(Musk Melon)'], 38),
+  ('pineapple', 'fruits', 'Pineapple', 'अनानास', 'kg', 168, array['Pineapple'], 39),
+  ('sapota', 'fruits', 'Sapota (Chikoo)', 'चीकू', 'kg', 96, array['Chikoos(Sapota)'], 40),
+  ('coconut', 'fruits', 'Coconut', 'नारियल', 'piece', 1440, '{}'::text[], 41),
+  ('other-fruit', 'fruits', 'Other fruit', 'अन्य फल', 'kg', 120, '{}'::text[], 42),
+  ('wheat', 'grains', 'Wheat', 'गेहूँ', 'kg', 8760, array['Wheat'], 43),
+  ('rice', 'grains', 'Rice', 'चावल', 'kg', 8760, array['Rice'], 44),
+  ('paddy', 'grains', 'Paddy', 'धान', 'kg', 8760, array['Paddy(Dhan)(Common)', 'Paddy(Dhan)(Basmati)'], 45),
+  ('maize', 'grains', 'Maize', 'मक्का', 'kg', 4320, array['Maize'], 46),
+  ('bajra', 'grains', 'Pearl millet (Bajra)', 'बाजरा', 'kg', 4320, array['Bajra(Pearl Millet/Cumbu)'], 47),
+  ('jowar', 'grains', 'Sorghum (Jowar)', 'ज्वार', 'kg', 4320, array['Jowar(Sorghum)'], 48),
+  ('ragi', 'grains', 'Finger millet (Ragi)', 'रागी', 'kg', 4320, array['Ragi (Finger Millet)'], 49),
+  ('barley', 'grains', 'Barley', 'जौ', 'kg', 4320, array['Barley (Jau)'], 50),
+  ('other-grain', 'grains', 'Other grain', 'अन्य अनाज', 'kg', 4320, '{}'::text[], 51),
+  ('chana', 'pulses', 'Chickpea (Chana)', 'चना', 'kg', 8760, array['Bengal Gram(Gram)(Whole)', 'Kabuli Chana(Chickpeas-White)'], 52),
+  ('tur', 'pulses', 'Pigeon pea (Tur)', 'अरहर', 'kg', 8760, array['Arhar (Tur/Red Gram)(Whole)'], 53),
+  ('moong', 'pulses', 'Green gram (Moong)', 'मूंग', 'kg', 8760, array['Green Gram (Moong)(Whole)'], 54),
+  ('urad', 'pulses', 'Black gram (Urad)', 'उड़द', 'kg', 8760, array['Black Gram (Urd Beans)(Whole)'], 55),
+  ('masoor', 'pulses', 'Lentil (Masoor)', 'मसूर', 'kg', 8760, array['Lentil (Masur)(Whole)'], 56),
+  ('rajma', 'pulses', 'Kidney beans (Rajma)', 'राजमा', 'kg', 8760, '{}'::text[], 57),
+  ('other-pulse', 'pulses', 'Other pulse', 'अन्य दाल', 'kg', 8760, '{}'::text[], 58),
+  ('turmeric', 'spices', 'Turmeric', 'हल्दी', 'kg', 8760, array['Turmeric'], 59),
+  ('dry-chilli', 'spices', 'Dry red chilli', 'लाल मिर्च', 'kg', 4320, array['Dry Chillies'], 60),
+  ('coriander-seed', 'spices', 'Coriander seed', 'धनिया बीज', 'kg', 8760, array['Corriander seed', 'Coriander seed'], 61),
+  ('cumin', 'spices', 'Cumin', 'जीरा', 'kg', 8760, array['Cummin Seed(Jeera)'], 62),
+  ('black-pepper', 'spices', 'Black pepper', 'काली मिर्च', 'kg', 8760, array['Black pepper'], 63),
+  ('other-spice', 'spices', 'Other spice', 'अन्य मसाला', 'kg', 8760, '{}'::text[], 64),
+  ('groundnut', 'oilseeds', 'Groundnut', 'मूंगफली', 'kg', 4320, array['Groundnut', 'Groundnut (Split)'], 65),
+  ('mustard', 'oilseeds', 'Mustard seed', 'सरसों', 'kg', 8760, array['Mustard'], 66),
+  ('soybean', 'oilseeds', 'Soybean', 'सोयाबीन', 'kg', 8760, array['Soyabean'], 67),
+  ('sesame', 'oilseeds', 'Sesame', 'तिल', 'kg', 8760, array['Sesamum(Sesame,Gingelly,Til)'], 68),
+  ('sunflower-seed', 'oilseeds', 'Sunflower seed', 'सूरजमुखी', 'kg', 8760, array['Sunflower'], 69),
+  ('other-oilseed', 'oilseeds', 'Other oilseed', 'अन्य तिलहन', 'kg', 8760, '{}'::text[], 70),
+  ('milk', 'dairy', 'Milk', 'दूध', 'litre', 24, '{}'::text[], 71),
+  ('curd', 'dairy', 'Curd', 'दही', 'kg', 48, '{}'::text[], 72),
+  ('paneer', 'dairy', 'Paneer', 'पनीर', 'kg', 72, '{}'::text[], 73),
+  ('ghee', 'dairy', 'Ghee', 'घी', 'kg', 4320, '{}'::text[], 74),
+  ('butter', 'dairy', 'Butter', 'मक्खन', 'kg', 336, '{}'::text[], 75),
+  ('other-dairy', 'dairy', 'Other dairy', 'अन्य डेयरी', 'kg', 48, '{}'::text[], 76),
+  ('jaggery', 'others', 'Jaggery (Gur)', 'गुड़', 'kg', 4320, array['Gur(Jaggery)'], 77),
+  ('honey', 'others', 'Honey', 'शहद', 'kg', 8760, '{}'::text[], 78),
+  ('other', 'others', 'Other produce', 'अन्य उपज', 'kg', 96, '{}'::text[], 79);
+
+insert into public.item_names (item_id, name) values
+  ('tomato', 'tomato'),
+  ('tomato', 'टमाटर'),
+  ('tomato', 'tomatoes'),
+  ('tomato', 'tomatoe'),
+  ('tomato', 'tamatar'),
+  ('tomato', 'tamaatar'),
+  ('tomato', 'tamater'),
+  ('tomato', 'tamato'),
+  ('potato', 'potato'),
+  ('potato', 'आलू'),
+  ('potato', 'potatoes'),
+  ('potato', 'potatoe'),
+  ('potato', 'aloo'),
+  ('potato', 'alu'),
+  ('potato', 'aaloo'),
+  ('potato', 'batata'),
+  ('onion', 'onion'),
+  ('onion', 'प्याज'),
+  ('onion', 'onions'),
+  ('onion', 'pyaz'),
+  ('onion', 'pyaaz'),
+  ('onion', 'piyaz'),
+  ('onion', 'pyaj'),
+  ('onion', 'piaz'),
+  ('onion', 'kanda'),
+  ('onion', 'kaanda'),
+  ('onion', 'प्याज़'),
+  ('onion', 'कांदा'),
+  ('spinach', 'spinach'),
+  ('spinach', 'पालक'),
+  ('spinach', 'palak'),
+  ('spinach', 'paalak'),
+  ('cauliflower', 'cauliflower'),
+  ('cauliflower', 'फूलगोभी'),
+  ('cauliflower', 'gobhi'),
+  ('cauliflower', 'gobi'),
+  ('cauliflower', 'phool gobhi'),
+  ('cauliflower', 'phoolgobhi'),
+  ('cauliflower', 'phool gobi'),
+  ('cauliflower', 'phulgobi'),
+  ('cauliflower', 'फूल गोभी'),
+  ('cauliflower', 'गोभी'),
+  ('cabbage', 'cabbage'),
+  ('cabbage', 'पत्ता गोभी'),
+  ('cabbage', 'patta gobhi'),
+  ('cabbage', 'pattagobhi'),
+  ('cabbage', 'band gobhi'),
+  ('cabbage', 'bandgobhi'),
+  ('cabbage', 'patta gobi'),
+  ('cabbage', 'बंद गोभी'),
+  ('cabbage', 'पत्तागोभी'),
+  ('brinjal', 'brinjal'),
+  ('brinjal', 'बैंगन'),
+  ('brinjal', 'eggplant'),
+  ('brinjal', 'aubergine'),
+  ('brinjal', 'baingan'),
+  ('brinjal', 'bengan'),
+  ('brinjal', 'baigan'),
+  ('brinjal', 'vangi'),
+  ('brinjal', 'vangan'),
+  ('okra', 'okra (lady finger)'),
+  ('okra', 'भिंडी'),
+  ('okra', 'okra'),
+  ('okra', 'lady finger'),
+  ('okra', 'ladyfinger'),
+  ('okra', 'ladies finger'),
+  ('okra', 'bhindi'),
+  ('okra', 'bhendi'),
+  ('okra', 'bhindee'),
+  ('okra', 'भिण्डी'),
+  ('carrot', 'carrot'),
+  ('carrot', 'गाजर'),
+  ('carrot', 'carrots'),
+  ('carrot', 'gajar'),
+  ('carrot', 'gaajar'),
+  ('green-chilli', 'green chilli'),
+  ('green-chilli', 'हरी मिर्च'),
+  ('green-chilli', 'green chili'),
+  ('green-chilli', 'chilli'),
+  ('green-chilli', 'chili'),
+  ('green-chilli', 'hari mirch'),
+  ('green-chilli', 'harimirch'),
+  ('green-chilli', 'mirchi'),
+  ('green-chilli', 'mirch'),
+  ('green-chilli', 'मिर्च'),
+  ('green-chilli', 'मिर्ची'),
+  ('capsicum', 'capsicum'),
+  ('capsicum', 'शिमला मिर्च'),
+  ('capsicum', 'bell pepper'),
+  ('capsicum', 'shimla mirch'),
+  ('capsicum', 'shimla mirchi'),
+  ('capsicum', 'simla mirch'),
+  ('cucumber', 'cucumber'),
+  ('cucumber', 'खीरा'),
+  ('cucumber', 'kheera'),
+  ('cucumber', 'khira'),
+  ('cucumber', 'kakdi'),
+  ('cucumber', 'ककड़ी'),
+  ('bottle-gourd', 'bottle gourd'),
+  ('bottle-gourd', 'लौकी'),
+  ('bottle-gourd', 'lauki'),
+  ('bottle-gourd', 'louki'),
+  ('bottle-gourd', 'ghiya'),
+  ('bottle-gourd', 'doodhi'),
+  ('bottle-gourd', 'dudhi'),
+  ('bottle-gourd', 'घीया'),
+  ('bitter-gourd', 'bitter gourd'),
+  ('bitter-gourd', 'करेला'),
+  ('bitter-gourd', 'karela'),
+  ('bitter-gourd', 'karella'),
+  ('ridge-gourd', 'ridge gourd'),
+  ('ridge-gourd', 'तोरई'),
+  ('ridge-gourd', 'turai'),
+  ('ridge-gourd', 'torai'),
+  ('ridge-gourd', 'tori'),
+  ('ridge-gourd', 'dodka'),
+  ('ridge-gourd', 'तोरी'),
+  ('pumpkin', 'pumpkin'),
+  ('pumpkin', 'कद्दू'),
+  ('pumpkin', 'kaddu'),
+  ('pumpkin', 'kadu'),
+  ('pumpkin', 'lal kaddu'),
+  ('pumpkin', 'kashiphal'),
+  ('radish', 'radish'),
+  ('radish', 'मूली'),
+  ('radish', 'mooli'),
+  ('radish', 'muli'),
+  ('green-peas', 'green peas'),
+  ('green-peas', 'मटर'),
+  ('green-peas', 'peas'),
+  ('green-peas', 'matar'),
+  ('green-peas', 'mattar'),
+  ('green-peas', 'mutter'),
+  ('green-peas', 'hara matar'),
+  ('green-peas', 'हरा मटर'),
+  ('beans', 'french beans'),
+  ('beans', 'बीन्स'),
+  ('beans', 'beans'),
+  ('beans', 'green beans'),
+  ('beans', 'sem'),
+  ('beans', 'phali'),
+  ('beans', 'farasbi'),
+  ('beans', 'सेम'),
+  ('beans', 'फली'),
+  ('coriander-leaves', 'coriander leaves'),
+  ('coriander-leaves', 'हरा धनिया'),
+  ('coriander-leaves', 'coriander'),
+  ('coriander-leaves', 'cilantro'),
+  ('coriander-leaves', 'dhaniya'),
+  ('coriander-leaves', 'dhania'),
+  ('coriander-leaves', 'hara dhaniya'),
+  ('coriander-leaves', 'kothimbir'),
+  ('coriander-leaves', 'kothmir'),
+  ('coriander-leaves', 'धनिया'),
+  ('methi-leaves', 'fenugreek leaves'),
+  ('methi-leaves', 'मेथी'),
+  ('methi-leaves', 'fenugreek'),
+  ('methi-leaves', 'methi'),
+  ('methi-leaves', 'methi leaves'),
+  ('garlic', 'garlic'),
+  ('garlic', 'लहसुन'),
+  ('garlic', 'lahsun'),
+  ('garlic', 'lehsun'),
+  ('garlic', 'lasun'),
+  ('garlic', 'lasan'),
+  ('ginger', 'ginger'),
+  ('ginger', 'अदरक'),
+  ('ginger', 'adrak'),
+  ('ginger', 'adrakh'),
+  ('ginger', 'aadrak'),
+  ('sweet-potato', 'sweet potato'),
+  ('sweet-potato', 'शकरकंद'),
+  ('sweet-potato', 'shakarkandi'),
+  ('sweet-potato', 'shakarkand'),
+  ('sweet-potato', 'shakarkandh'),
+  ('sweet-potato', 'शकरकंदी'),
+  ('drumstick', 'drumstick'),
+  ('drumstick', 'सहजन'),
+  ('drumstick', 'drumsticks'),
+  ('drumstick', 'moringa'),
+  ('drumstick', 'sahjan'),
+  ('drumstick', 'sehjan'),
+  ('drumstick', 'shevga'),
+  ('drumstick', 'सहजन फली'),
+  ('beetroot', 'beetroot'),
+  ('beetroot', 'चुकंदर'),
+  ('beetroot', 'beet'),
+  ('beetroot', 'chukandar'),
+  ('beetroot', 'chukander'),
+  ('spring-onion', 'spring onion'),
+  ('spring-onion', 'हरा प्याज'),
+  ('spring-onion', 'green onion'),
+  ('spring-onion', 'hara pyaz'),
+  ('spring-onion', 'hari pyaaz'),
+  ('spring-onion', 'pyaz patti'),
+  ('other-vegetable', 'other vegetable'),
+  ('other-vegetable', 'अन्य सब्ज़ी'),
+  ('other-vegetable', 'vegetable'),
+  ('other-vegetable', 'sabzi'),
+  ('other-vegetable', 'sabji'),
+  ('other-vegetable', 'सब्ज़ी'),
+  ('other-vegetable', 'सब्जी'),
+  ('banana', 'banana'),
+  ('banana', 'केला'),
+  ('banana', 'bananas'),
+  ('banana', 'kela'),
+  ('banana', 'kele'),
+  ('banana', 'केले'),
+  ('mango', 'mango'),
+  ('mango', 'आम'),
+  ('mango', 'mangoes'),
+  ('mango', 'aam'),
+  ('mango', 'aamba'),
+  ('mango', 'keri'),
+  ('mango', 'केरी'),
+  ('apple', 'apple'),
+  ('apple', 'सेब'),
+  ('apple', 'apples'),
+  ('apple', 'seb'),
+  ('apple', 'sev'),
+  ('apple', 'saib'),
+  ('grapes', 'grapes'),
+  ('grapes', 'अंगूर'),
+  ('grapes', 'grape'),
+  ('grapes', 'angoor'),
+  ('grapes', 'angur'),
+  ('grapes', 'draksh'),
+  ('papaya', 'papaya'),
+  ('papaya', 'पपीता'),
+  ('papaya', 'papita'),
+  ('papaya', 'papeeta'),
+  ('guava', 'guava'),
+  ('guava', 'अमरूद'),
+  ('guava', 'amrood'),
+  ('guava', 'amrud'),
+  ('guava', 'peru'),
+  ('guava', 'jamrukh'),
+  ('pomegranate', 'pomegranate'),
+  ('pomegranate', 'अनार'),
+  ('pomegranate', 'anar'),
+  ('pomegranate', 'anaar'),
+  ('pomegranate', 'dalimb'),
+  ('orange', 'orange'),
+  ('orange', 'संतरा'),
+  ('orange', 'oranges'),
+  ('orange', 'santra'),
+  ('orange', 'santara'),
+  ('orange', 'narangi'),
+  ('lemon', 'lemon'),
+  ('lemon', 'नींबू'),
+  ('lemon', 'lime'),
+  ('lemon', 'nimbu'),
+  ('lemon', 'neembu'),
+  ('lemon', 'nimboo'),
+  ('lemon', 'limbu'),
+  ('lemon', 'निंबू'),
+  ('watermelon', 'watermelon'),
+  ('watermelon', 'तरबूज'),
+  ('watermelon', 'water melon'),
+  ('watermelon', 'tarbooz'),
+  ('watermelon', 'tarbuj'),
+  ('watermelon', 'tarbuz'),
+  ('watermelon', 'kalingad'),
+  ('watermelon', 'तरबूज़'),
+  ('muskmelon', 'muskmelon'),
+  ('muskmelon', 'खरबूजा'),
+  ('muskmelon', 'musk melon'),
+  ('muskmelon', 'kharbuja'),
+  ('muskmelon', 'kharbooja'),
+  ('muskmelon', 'kharbooza'),
+  ('pineapple', 'pineapple'),
+  ('pineapple', 'अनानास'),
+  ('pineapple', 'ananas'),
+  ('pineapple', 'anannas'),
+  ('sapota', 'sapota (chikoo)'),
+  ('sapota', 'चीकू'),
+  ('sapota', 'sapota'),
+  ('sapota', 'chikoo'),
+  ('sapota', 'chiku'),
+  ('sapota', 'cheeku'),
+  ('coconut', 'coconut'),
+  ('coconut', 'नारियल'),
+  ('coconut', 'nariyal'),
+  ('coconut', 'nariyel'),
+  ('coconut', 'naral'),
+  ('other-fruit', 'other fruit'),
+  ('other-fruit', 'अन्य फल'),
+  ('other-fruit', 'fruit'),
+  ('other-fruit', 'phal'),
+  ('other-fruit', 'फल'),
+  ('wheat', 'wheat'),
+  ('wheat', 'गेहूँ'),
+  ('wheat', 'gehu'),
+  ('wheat', 'gehun'),
+  ('wheat', 'gehoon'),
+  ('wheat', 'gehoo'),
+  ('wheat', 'gahu'),
+  ('wheat', 'गेहूं'),
+  ('wheat', 'गेहू'),
+  ('rice', 'rice'),
+  ('rice', 'चावल'),
+  ('rice', 'chawal'),
+  ('rice', 'chaval'),
+  ('rice', 'basmati'),
+  ('paddy', 'paddy'),
+  ('paddy', 'धान'),
+  ('paddy', 'dhan'),
+  ('paddy', 'dhaan'),
+  ('maize', 'maize'),
+  ('maize', 'मक्का'),
+  ('maize', 'corn'),
+  ('maize', 'makka'),
+  ('maize', 'makki'),
+  ('maize', 'makai'),
+  ('maize', 'मक्की'),
+  ('bajra', 'pearl millet (bajra)'),
+  ('bajra', 'बाजरा'),
+  ('bajra', 'pearl millet'),
+  ('bajra', 'bajra'),
+  ('bajra', 'bajri'),
+  ('jowar', 'sorghum (jowar)'),
+  ('jowar', 'ज्वार'),
+  ('jowar', 'sorghum'),
+  ('jowar', 'jowar'),
+  ('jowar', 'jawar'),
+  ('jowar', 'juar'),
+  ('ragi', 'finger millet (ragi)'),
+  ('ragi', 'रागी'),
+  ('ragi', 'finger millet'),
+  ('ragi', 'ragi'),
+  ('ragi', 'nachni'),
+  ('ragi', 'mandua'),
+  ('ragi', 'मंडुआ'),
+  ('barley', 'barley'),
+  ('barley', 'जौ'),
+  ('barley', 'jau'),
+  ('other-grain', 'other grain'),
+  ('other-grain', 'अन्य अनाज'),
+  ('other-grain', 'grain'),
+  ('other-grain', 'anaj'),
+  ('other-grain', 'अनाज'),
+  ('chana', 'chickpea (chana)'),
+  ('chana', 'चना'),
+  ('chana', 'chickpea'),
+  ('chana', 'chickpeas'),
+  ('chana', 'gram'),
+  ('chana', 'chana'),
+  ('chana', 'channa'),
+  ('chana', 'kabuli chana'),
+  ('chana', 'chana dal'),
+  ('chana', 'चने'),
+  ('tur', 'pigeon pea (tur)'),
+  ('tur', 'अरहर'),
+  ('tur', 'pigeon pea'),
+  ('tur', 'tur'),
+  ('tur', 'toor'),
+  ('tur', 'toor dal'),
+  ('tur', 'tuar'),
+  ('tur', 'arhar'),
+  ('tur', 'arhar dal'),
+  ('tur', 'तुअर'),
+  ('tur', 'तूर'),
+  ('moong', 'green gram (moong)'),
+  ('moong', 'मूंग'),
+  ('moong', 'green gram'),
+  ('moong', 'moong'),
+  ('moong', 'mung'),
+  ('moong', 'moong dal'),
+  ('moong', 'मूँग'),
+  ('urad', 'black gram (urad)'),
+  ('urad', 'उड़द'),
+  ('urad', 'black gram'),
+  ('urad', 'urad'),
+  ('urad', 'urd'),
+  ('urad', 'urad dal'),
+  ('urad', 'उरद'),
+  ('masoor', 'lentil (masoor)'),
+  ('masoor', 'मसूर'),
+  ('masoor', 'lentil'),
+  ('masoor', 'lentils'),
+  ('masoor', 'masoor'),
+  ('masoor', 'masur'),
+  ('masoor', 'masoor dal'),
+  ('rajma', 'kidney beans (rajma)'),
+  ('rajma', 'राजमा'),
+  ('rajma', 'kidney beans'),
+  ('rajma', 'rajma'),
+  ('rajma', 'rajmah'),
+  ('other-pulse', 'other pulse'),
+  ('other-pulse', 'अन्य दाल'),
+  ('other-pulse', 'pulse'),
+  ('other-pulse', 'dal'),
+  ('other-pulse', 'daal'),
+  ('other-pulse', 'दाल'),
+  ('turmeric', 'turmeric'),
+  ('turmeric', 'हल्दी'),
+  ('turmeric', 'haldi'),
+  ('turmeric', 'halad'),
+  ('dry-chilli', 'dry red chilli'),
+  ('dry-chilli', 'लाल मिर्च'),
+  ('dry-chilli', 'dry chilli'),
+  ('dry-chilli', 'red chilli'),
+  ('dry-chilli', 'lal mirch'),
+  ('dry-chilli', 'sukhi mirch'),
+  ('dry-chilli', 'सूखी मिर्च'),
+  ('coriander-seed', 'coriander seed'),
+  ('coriander-seed', 'धनिया बीज'),
+  ('coriander-seed', 'coriander seeds'),
+  ('coriander-seed', 'dhaniya beej'),
+  ('coriander-seed', 'sukha dhaniya'),
+  ('coriander-seed', 'साबुत धनिया'),
+  ('cumin', 'cumin'),
+  ('cumin', 'जीरा'),
+  ('cumin', 'jeera'),
+  ('cumin', 'jira'),
+  ('cumin', 'zeera'),
+  ('black-pepper', 'black pepper'),
+  ('black-pepper', 'काली मिर्च'),
+  ('black-pepper', 'pepper'),
+  ('black-pepper', 'kali mirch'),
+  ('black-pepper', 'kaali mirch'),
+  ('other-spice', 'other spice'),
+  ('other-spice', 'अन्य मसाला'),
+  ('other-spice', 'spice'),
+  ('other-spice', 'masala'),
+  ('other-spice', 'मसाला'),
+  ('groundnut', 'groundnut'),
+  ('groundnut', 'मूंगफली'),
+  ('groundnut', 'peanut'),
+  ('groundnut', 'peanuts'),
+  ('groundnut', 'moongphali'),
+  ('groundnut', 'mungfali'),
+  ('groundnut', 'moongfali'),
+  ('groundnut', 'shengdana'),
+  ('groundnut', 'मूँगफली'),
+  ('mustard', 'mustard seed'),
+  ('mustard', 'सरसों'),
+  ('mustard', 'mustard'),
+  ('mustard', 'sarson'),
+  ('mustard', 'sarso'),
+  ('mustard', 'rai'),
+  ('mustard', 'राई'),
+  ('soybean', 'soybean'),
+  ('soybean', 'सोयाबीन'),
+  ('soybean', 'soyabean'),
+  ('soybean', 'soya'),
+  ('soybean', 'soy'),
+  ('sesame', 'sesame'),
+  ('sesame', 'तिल'),
+  ('sesame', 'til'),
+  ('sesame', 'gingelly'),
+  ('sunflower-seed', 'sunflower seed'),
+  ('sunflower-seed', 'सूरजमुखी'),
+  ('sunflower-seed', 'sunflower'),
+  ('sunflower-seed', 'surajmukhi'),
+  ('other-oilseed', 'other oilseed'),
+  ('other-oilseed', 'अन्य तिलहन'),
+  ('other-oilseed', 'oilseed'),
+  ('other-oilseed', 'tilhan'),
+  ('other-oilseed', 'तिलहन'),
+  ('milk', 'milk'),
+  ('milk', 'दूध'),
+  ('milk', 'cow milk'),
+  ('milk', 'buffalo milk'),
+  ('milk', 'doodh'),
+  ('milk', 'dudh'),
+  ('curd', 'curd'),
+  ('curd', 'दही'),
+  ('curd', 'yogurt'),
+  ('curd', 'yoghurt'),
+  ('curd', 'dahi'),
+  ('curd', 'dahee'),
+  ('paneer', 'paneer'),
+  ('paneer', 'पनीर'),
+  ('paneer', 'cottage cheese'),
+  ('paneer', 'panir'),
+  ('ghee', 'ghee'),
+  ('ghee', 'घी'),
+  ('ghee', 'ghi'),
+  ('ghee', 'desi ghee'),
+  ('butter', 'butter'),
+  ('butter', 'मक्खन'),
+  ('butter', 'makhan'),
+  ('butter', 'makkhan'),
+  ('butter', 'loni'),
+  ('other-dairy', 'other dairy'),
+  ('other-dairy', 'अन्य डेयरी'),
+  ('other-dairy', 'dairy'),
+  ('other-dairy', 'डेयरी'),
+  ('jaggery', 'jaggery (gur)'),
+  ('jaggery', 'गुड़'),
+  ('jaggery', 'jaggery'),
+  ('jaggery', 'gur'),
+  ('jaggery', 'gud'),
+  ('jaggery', 'गुड'),
+  ('honey', 'honey'),
+  ('honey', 'शहद'),
+  ('honey', 'shahad'),
+  ('honey', 'shehad'),
+  ('honey', 'madhu'),
+  ('other', 'other produce'),
+  ('other', 'अन्य उपज'),
+  ('other', 'other'),
+  ('other', 'anya'),
+  ('other', 'अन्य')
+on conflict do nothing;
+
+-- Illustrative national prices, marked source = 'sample', so the rate suggestion and the price score
+-- work before the live mandi feed runs. Live or manual prices always win over these.
+insert into public.reference_prices (item_id, state, district, source, price_date, mandi_price) values
+  ('tomato', '', '', 'sample', date '2026-10-01', 15),
+  ('potato', '', '', 'sample', date '2026-10-01', 12),
+  ('onion', '', '', 'sample', date '2026-10-01', 18),
+  ('spinach', '', '', 'sample', date '2026-10-01', 15),
+  ('cauliflower', '', '', 'sample', date '2026-10-01', 18),
+  ('cabbage', '', '', 'sample', date '2026-10-01', 10),
+  ('brinjal', '', '', 'sample', date '2026-10-01', 16),
+  ('okra', '', '', 'sample', date '2026-10-01', 25),
+  ('carrot', '', '', 'sample', date '2026-10-01', 20),
+  ('green-chilli', '', '', 'sample', date '2026-10-01', 30),
+  ('capsicum', '', '', 'sample', date '2026-10-01', 30),
+  ('cucumber', '', '', 'sample', date '2026-10-01', 15),
+  ('bottle-gourd', '', '', 'sample', date '2026-10-01', 12),
+  ('bitter-gourd', '', '', 'sample', date '2026-10-01', 25),
+  ('ridge-gourd', '', '', 'sample', date '2026-10-01', 22),
+  ('pumpkin', '', '', 'sample', date '2026-10-01', 12),
+  ('radish', '', '', 'sample', date '2026-10-01', 12),
+  ('green-peas', '', '', 'sample', date '2026-10-01', 35),
+  ('beans', '', '', 'sample', date '2026-10-01', 30),
+  ('coriander-leaves', '', '', 'sample', date '2026-10-01', 40),
+  ('methi-leaves', '', '', 'sample', date '2026-10-01', 30),
+  ('garlic', '', '', 'sample', date '2026-10-01', 80),
+  ('ginger', '', '', 'sample', date '2026-10-01', 50),
+  ('sweet-potato', '', '', 'sample', date '2026-10-01', 20),
+  ('drumstick', '', '', 'sample', date '2026-10-01', 40),
+  ('beetroot', '', '', 'sample', date '2026-10-01', 20),
+  ('spring-onion', '', '', 'sample', date '2026-10-01', 25),
+  ('other-vegetable', '', '', 'sample', date '2026-10-01', 20),
+  ('banana', '', '', 'sample', date '2026-10-01', 20),
+  ('mango', '', '', 'sample', date '2026-10-01', 45),
+  ('apple', '', '', 'sample', date '2026-10-01', 70),
+  ('grapes', '', '', 'sample', date '2026-10-01', 50),
+  ('papaya', '', '', 'sample', date '2026-10-01', 18),
+  ('guava', '', '', 'sample', date '2026-10-01', 30),
+  ('pomegranate', '', '', 'sample', date '2026-10-01', 80),
+  ('orange', '', '', 'sample', date '2026-10-01', 40),
+  ('lemon', '', '', 'sample', date '2026-10-01', 40),
+  ('watermelon', '', '', 'sample', date '2026-10-01', 10),
+  ('muskmelon', '', '', 'sample', date '2026-10-01', 18),
+  ('pineapple', '', '', 'sample', date '2026-10-01', 30),
+  ('sapota', '', '', 'sample', date '2026-10-01', 30),
+  ('coconut', '', '', 'sample', date '2026-10-01', 18),
+  ('other-fruit', '', '', 'sample', date '2026-10-01', 30),
+  ('wheat', '', '', 'sample', date '2026-10-01', 24),
+  ('rice', '', '', 'sample', date '2026-10-01', 32),
+  ('paddy', '', '', 'sample', date '2026-10-01', 22),
+  ('maize', '', '', 'sample', date '2026-10-01', 21),
+  ('bajra', '', '', 'sample', date '2026-10-01', 24),
+  ('jowar', '', '', 'sample', date '2026-10-01', 30),
+  ('ragi', '', '', 'sample', date '2026-10-01', 35),
+  ('barley', '', '', 'sample', date '2026-10-01', 22),
+  ('other-grain', '', '', 'sample', date '2026-10-01', 25),
+  ('chana', '', '', 'sample', date '2026-10-01', 55),
+  ('tur', '', '', 'sample', date '2026-10-01', 90),
+  ('moong', '', '', 'sample', date '2026-10-01', 80),
+  ('urad', '', '', 'sample', date '2026-10-01', 75),
+  ('masoor', '', '', 'sample', date '2026-10-01', 60),
+  ('rajma', '', '', 'sample', date '2026-10-01', 90),
+  ('other-pulse', '', '', 'sample', date '2026-10-01', 70),
+  ('turmeric', '', '', 'sample', date '2026-10-01', 120),
+  ('dry-chilli', '', '', 'sample', date '2026-10-01', 140),
+  ('coriander-seed', '', '', 'sample', date '2026-10-01', 70),
+  ('cumin', '', '', 'sample', date '2026-10-01', 220),
+  ('black-pepper', '', '', 'sample', date '2026-10-01', 500),
+  ('other-spice', '', '', 'sample', date '2026-10-01', 150),
+  ('groundnut', '', '', 'sample', date '2026-10-01', 55),
+  ('mustard', '', '', 'sample', date '2026-10-01', 55),
+  ('soybean', '', '', 'sample', date '2026-10-01', 42),
+  ('sesame', '', '', 'sample', date '2026-10-01', 120),
+  ('sunflower-seed', '', '', 'sample', date '2026-10-01', 55),
+  ('other-oilseed', '', '', 'sample', date '2026-10-01', 50),
+  ('milk', '', '', 'sample', date '2026-10-01', 40),
+  ('curd', '', '', 'sample', date '2026-10-01', 60),
+  ('paneer', '', '', 'sample', date '2026-10-01', 280),
+  ('ghee', '', '', 'sample', date '2026-10-01', 550),
+  ('butter', '', '', 'sample', date '2026-10-01', 450),
+  ('other-dairy', '', '', 'sample', date '2026-10-01', 60),
+  ('jaggery', '', '', 'sample', date '2026-10-01', 40),
+  ('honey', '', '', 'sample', date '2026-10-01', 250),
+  ('other', '', '', 'sample', date '2026-10-01', 30);
+
+-- ===== 20261005000003_matching_functions.sql =====
+
+-- Matching engine, part 2: the algorithms that run inside the database.
+--   match_listings     steps 2 + 3 (hard rules, score), built from live stock on every request (step 4)
+--   match_hidden       how many listings each hard rule removed, for "why don't I see …"
+--   rate_inputs        the signals the rate suggestion needs (step 5 runs in the browser)
+--   quote_delivery     delivery fee and batch progress before a buyer places an order
+--   place_order        one-step reserve (step 4) + delivery fee + household batches
+--   release_due_batches, update_order_status, update_batch_status
+-- The TypeScript reference in src/lib/matching/engine.ts implements the same rules; tests compare them.
+
+-- Helpers --------------------------------------------------------------------------------------
+
+create or replace function public.geo_km(lat1 double precision, lng1 double precision, lat2 double precision, lng2 double precision)
+returns double precision
+language sql immutable parallel safe
+set search_path = ''
+as $$
+  select 2 * 6371 * asin(least(1, sqrt(
+    power(sin(radians(lat2 - lat1) / 2), 2)
+    + cos(radians(lat1)) * cos(radians(lat2)) * power(sin(radians(lng2 - lng1) / 2), 2)
+  )))
+$$;
+
+-- How many base units (kg, litre, piece, dozen) one selling unit holds; null when they don't convert.
+create or replace function public.unit_factor(p_unit public.unit, p_base text)
+returns numeric
+language sql immutable parallel safe
+set search_path = ''
+as $$
+  select (case p_base
+    when 'kg' then case p_unit when 'kg' then 1 when 'quintal' then 100 when 'tonne' then 1000 end
+    when 'litre' then case p_unit when 'litre' then 1 end
+    when 'piece' then case p_unit when 'piece' then 1 when 'dozen' then 12 end
+    when 'dozen' then case p_unit when 'dozen' then 1 end
+  end)::numeric
+$$;
+
+-- Distance a delivery is charged on: rounded to whole km (min 1), so fees never reveal a farm's exact spot.
+create or replace function public.billing_km(p_km double precision)
+returns numeric
+language sql immutable parallel safe
+set search_path = ''
+as $$
+  select greatest(1, round(p_km::numeric))
+$$;
+
+-- Today's reference price for an item where the buyer is: the most specific area first
+-- (district, then state, then all-India), then manual > live feed > sample, then the newest.
+-- Live prices older than 30 days are ignored. Shop price falls back to mandi x category markup.
+-- Area names compared loosely: case, outer spaces and a trailing "district" don't matter,
+-- so an address saved as "Pune District" finds the mandi price filed under "Pune".
+create or replace function public.area_key(p text)
+returns text
+language sql immutable
+set search_path = ''
+as $$
+  select regexp_replace(lower(btrim(coalesce(p, ''))), '\s+(district|dist\.?)$', '')
+$$;
+
+create or replace function public.price_ref(p_item_id text, p_state text, p_district text)
+returns table (mandi numeric, shop numeric, source text, price_date date, area text)
+language sql stable
+set search_path = ''
+as $$
+  with best as (
+    select r.*,
+      case when r.district <> '' then 2 when r.state <> '' then 1 else 0 end as specificity
+    from public.reference_prices r
+    where r.item_id = p_item_id
+      and (r.state = '' or public.area_key(r.state) = public.area_key(p_state))
+      and (r.district = '' or public.area_key(r.district) = public.area_key(p_district))
+      and (r.source in ('sample', 'manual') or r.price_date >= current_date - 30)
+    order by specificity desc,
+      case r.source when 'manual' then 3 when 'agmarknet' then 2 else 1 end desc,
+      r.price_date desc
+    limit 1
+  )
+  select
+    b.mandi_price,
+    coalesce(b.shop_price, b.mandi_price * coalesce((s.shop_markup ->> i.category::text)::numeric, 2)),
+    b.source,
+    b.price_date,
+    case b.specificity when 2 then b.district when 1 then b.state else 'India' end
+  from best b
+  join public.items i on i.id = p_item_id
+  cross join public.engine_settings s
+$$;
+
+create or replace function public.area_rule_matches(
+  r public.area_rules, p_item_id text, p_category public.produce_category, p_state text, p_district text, p_day date
+)
+returns boolean
+language sql immutable
+set search_path = ''
+as $$
+  select (r.state is null or lower(r.state) = lower(coalesce(p_state, '')))
+     and (r.district is null or lower(r.district) = lower(coalesce(p_district, '')))
+     and (r.item_id = p_item_id or (r.item_id is null and r.category = p_category))
+     and p_day between r.starts_on and r.ends_on
+$$;
+
+-- Steps 2 + 3: listings that can serve this buyer, best first ---------------------------------
+create or replace function public.match_listings(
+  p_item_id text default null,
+  p_quantity numeric default null,            -- in the item's base unit; null = just browsing
+  p_lat double precision default null,
+  p_lng double precision default null,
+  p_buyer_type public.consumer_type default null,
+  p_max_km numeric default null,              -- null = the default for the buyer type
+  p_state text default null,
+  p_district text default null,
+  p_category public.produce_category default null,
+  p_organic boolean default false,
+  p_limit integer default 48,
+  p_offset integer default 0,
+  p_now timestamptz default now()
+)
+returns table (
+  id uuid, farmer_id uuid, item_id text, category public.produce_category, name text, variety text,
+  description text, unit public.unit, price_per_unit numeric, qty_available numeric, min_order_qty numeric,
+  harvested_at timestamptz, is_organic boolean, images text[], district text, state text, created_at timestamptz,
+  farmer_name text, farm_name text, farmer_avatar text, farmer_verified boolean,
+  farmer_rating double precision, farmer_ratings_count integer, orders_completed integer, orders_on_time integer,
+  distance_km numeric, travel_hours numeric, hours_used numeric, shelf_life_hours integer,
+  price_base double precision, shop_price double precision, trip_cost numeric,
+  part_price double precision, part_fresh double precision, part_near double precision,
+  part_trust double precision, part_fill double precision, score double precision, total_count bigint
+)
+language sql stable
+security definer
+set search_path = ''
+as $$
+  with s as (
+    select e.*,
+      coalesce(p_max_km, case when p_buyer_type = 'industrial' then e.business_max_km else e.household_max_km end)::float8 as max_km,
+      case when p_buyer_type = 'industrial' then e.w_business else e.w_household end as w,
+      (p_now at time zone 'Asia/Kolkata')::date as day,
+      (p_lat is not null and p_lng is not null) as located
+    from public.engine_settings e
+    limit 1
+  ),
+  cand as (
+    select p.id, p.farmer_id, p.item_id, p.category, p.name, p.variety, p.description, p.unit, p.price_per_unit,
+      p.qty_available, p.min_order_qty, p.harvested_at, p.is_organic, p.images, p.district, p.state, p.created_at,
+      i.shelf_life_hours,
+      (p.price_per_unit / uf.f)::float8 as price_base,
+      (p.qty_available * uf.f)::float8 as avail_base,
+      (p.min_order_qty * uf.f)::float8 as min_base,
+      coalesce(p.delivery_radius_km, fd.delivery_radius_km, s.farmer_radius_km)::float8 as radius,
+      fd.verified, fd.orders_completed, fd.orders_on_time,
+      case when s.located and p.lat is not null and p.lng is not null then public.geo_km(p_lat, p_lng, p.lat, p.lng) end as dist
+    from public.produce p
+    join public.items i on i.id = p.item_id
+    join public.farmer_details fd on fd.user_id = p.farmer_id
+    cross join s
+    cross join lateral (select public.unit_factor(p.unit, i.base_unit) as f) uf
+    where p.status = 'active' and p.qty_available > 0 and uf.f is not null
+      and (p_item_id is null or p.item_id = p_item_id)
+      and (p_category is null or p.category = p_category)
+      and (not coalesce(p_organic, false) or p.is_organic)
+      -- coarse latitude box from the index; the exact distance rule follows
+      and (not s.located or p.lat between p_lat - s.max_km / 111.0 and p_lat + s.max_km / 111.0)
+  ),
+  kept as (
+    select c.*,
+      case when c.dist is null then 0 else c.dist * s.road_factor / s.speed_kmph end::float8 as travel_h,
+      (extract(epoch from (p_now - c.harvested_at)) / 3600.0)::float8 as since_h
+    from cand c cross join s
+    where (not s.require_verified or c.verified)
+      and (not s.located or (c.dist is not null and c.dist <= s.max_km and c.dist <= c.radius))
+      and (p_quantity is null or (p_quantity >= c.min_base and (p_buyer_type = 'industrial' or c.avail_base >= p_quantity)))
+  ),
+  fresh as (
+    select k.*, (k.since_h + k.travel_h) as used_h
+    from kept k cross join s
+    where k.since_h + k.travel_h <= s.freshness_limit * k.shelf_life_hours
+      and not exists (
+        select 1 from public.area_rules r
+        where r.action = 'hide' and public.area_rule_matches(r, k.item_id, k.category, p_state, p_district, s.day)
+      )
+  ),
+  areas as (
+    select distinct f.item_id, coalesce(p_state, f.state) as st, coalesce(p_district, f.district) as di from fresh f
+  ),
+  priced as (
+    select a.item_id, a.st, a.di, pr.shop::float8 as shop
+    from areas a
+    left join lateral public.price_ref(a.item_id, a.st, a.di) pr on true
+  ),
+  parts as (
+    select f.*, pr.shop as shop_price,
+      case when pr.shop > 0 then least(1, greatest(0, 1.5 - f.price_base / pr.shop)) else 0.5 end as p_price,
+      least(1, greatest(0, 1 - f.used_h / f.shelf_life_hours)) as p_fresh,
+      case when f.dist is null then 0.5 else least(1, greatest(0, 1 - f.dist / s.max_km)) end as p_near,
+      (f.orders_on_time + s.trust_prior_on_time)::float8 / (f.orders_completed + s.trust_prior_total)::float8 as p_trust,
+      case when p_quantity is null then 1 else least(1, f.avail_base / p_quantity::float8) end as p_fill,
+      (s.w ->> 'price')::float8 as w_price, (s.w ->> 'fresh')::float8 as w_fresh, (s.w ->> 'near')::float8 as w_near,
+      (s.w ->> 'trust')::float8 as w_trust, (s.w ->> 'fill')::float8 as w_fill,
+      s.road_factor, s.cost_per_road_km
+    from fresh f
+    cross join s
+    left join priced pr on pr.item_id = f.item_id
+      and pr.st is not distinct from coalesce(p_state, f.state)
+      and pr.di is not distinct from coalesce(p_district, f.district)
+  ),
+  scored as (
+    select p.*,
+      round((p.w_price * p.p_price + p.w_fresh * p.p_fresh + p.w_near * p.p_near + p.w_trust * p.p_trust + p.w_fill * p.p_fill)::numeric, 9)::float8 as score,
+      count(*) over () as total_count
+    from parts p
+  ),
+  page as (
+    select * from scored
+    order by score desc, dist asc nulls last, price_base asc, id asc
+    limit greatest(0, least(coalesce(p_limit, 48), 500)) offset greatest(0, coalesce(p_offset, 0))
+  )
+  select
+    g.id, g.farmer_id, g.item_id, g.category, g.name, g.variety, g.description, g.unit, g.price_per_unit,
+    g.qty_available, g.min_order_qty, g.harvested_at, g.is_organic, g.images, g.district, g.state, g.created_at,
+    pr.full_name, fd.farm_name, pr.avatar_url, g.verified,
+    r.avg_rating, coalesce(r.ratings_count, 0), g.orders_completed, g.orders_on_time,
+    case when g.dist is null then null else public.billing_km(g.dist) end,
+    round(g.travel_h::numeric, 1), round(g.used_h::numeric, 1), g.shelf_life_hours,
+    g.price_base, g.shop_price,
+    case when g.dist is null then null else round(2 * g.road_factor * public.billing_km(g.dist) * g.cost_per_road_km, 2) end,
+    g.p_price, g.p_fresh, g.p_near, g.p_trust, g.p_fill, g.score, g.total_count
+  from page g
+  join public.profiles pr on pr.id = g.farmer_id
+  left join public.farmer_details fd on fd.user_id = g.farmer_id
+  left join public.farmer_ratings r on r.farmer_id = g.farmer_id
+  order by g.score desc, g.dist asc nulls last, g.price_base asc, g.id asc
+$$;
+
+-- How many listings of the item each hard rule removed (the first rule each one breaks).
+create or replace function public.match_hidden(
+  p_item_id text,
+  p_quantity numeric default null,
+  p_lat double precision default null,
+  p_lng double precision default null,
+  p_buyer_type public.consumer_type default null,
+  p_max_km numeric default null,
+  p_state text default null,
+  p_district text default null,
+  p_now timestamptz default now()
+)
+returns table (reason text, listings bigint)
+language sql stable
+security definer
+set search_path = ''
+as $$
+  with s as (
+    select e.*,
+      coalesce(p_max_km, case when p_buyer_type = 'industrial' then e.business_max_km else e.household_max_km end)::float8 as max_km,
+      (p_now at time zone 'Asia/Kolkata')::date as day,
+      (p_lat is not null and p_lng is not null) as located
+    from public.engine_settings e limit 1
+  ),
+  c as (
+    select p.item_id, p.category, i.shelf_life_hours, fd.verified,
+      (p.qty_available * uf.f)::float8 as avail_base, (p.min_order_qty * uf.f)::float8 as min_base,
+      coalesce(p.delivery_radius_km, fd.delivery_radius_km, s.farmer_radius_km)::float8 as radius,
+      case when s.located and p.lat is not null and p.lng is not null then public.geo_km(p_lat, p_lng, p.lat, p.lng) end as dist,
+      (extract(epoch from (p_now - p.harvested_at)) / 3600.0)::float8 as since_h
+    from public.produce p
+    join public.items i on i.id = p.item_id
+    join public.farmer_details fd on fd.user_id = p.farmer_id
+    cross join s
+    cross join lateral (select public.unit_factor(p.unit, i.base_unit) as f) uf
+    where p.item_id = p_item_id and p.status = 'active' and p.qty_available > 0 and uf.f is not null
+  ),
+  why as (
+    select case
+      when s.require_verified and not c.verified then 'unverified'
+      when s.located and c.dist is null then 'no_location'
+      when s.located and (c.dist > s.max_km or c.dist > c.radius) then 'too_far'
+      when p_quantity is not null and p_quantity < c.min_base then 'below_min_order'
+      when p_quantity is not null and p_buyer_type is distinct from 'industrial' and c.avail_base < p_quantity then 'not_enough_stock'
+      when c.since_h + case when c.dist is null then 0 else c.dist * s.road_factor / s.speed_kmph end > s.freshness_limit * c.shelf_life_hours then 'not_fresh_on_arrival'
+      when exists (select 1 from public.area_rules r where r.action = 'hide' and public.area_rule_matches(r, c.item_id, c.category, p_state, p_district, s.day)) then 'hidden_in_area'
+    end as reason
+    from c cross join s
+  )
+  select reason, count(*) from why where reason is not null group by reason order by count(*) desc, reason
+$$;
+
+-- Signals for the rate suggestion around a point (step 5 runs in the browser with these).
+create or replace function public.rate_inputs(
+  p_item_id text,
+  p_lat double precision,
+  p_lng double precision,
+  p_radius_km numeric,
+  p_state text default null,
+  p_district text default null
+)
+returns table (
+  mandi numeric, shop numeric, source text, price_date date, area text,
+  demand_qty numeric, demand_requests integer, supply_qty numeric, demand_multiplier numeric
+)
+language sql stable
+security definer
+set search_path = ''
+as $$
+  with i as (select * from public.items where id = p_item_id),
+  d as (
+    select coalesce(sum(dr.quantity * public.unit_factor(dr.unit, i.base_unit)), 0) as qty, count(*)::int as n
+    from public.demand_requests dr cross join i
+    where dr.item_id = p_item_id and dr.status = 'open'
+      and (dr.needed_by is null or dr.needed_by >= current_date)
+      and public.unit_factor(dr.unit, i.base_unit) is not null
+      and (p_lat is null or dr.lat is null or public.geo_km(p_lat, p_lng, dr.lat, dr.lng) <= p_radius_km)
+  ),
+  sup as (
+    select coalesce(sum(p.qty_available * public.unit_factor(p.unit, i.base_unit)), 0) as qty
+    from public.produce p cross join i
+    where p.item_id = p_item_id and p.status = 'active'
+      and (p_lat is null or p.lat is null or public.geo_km(p_lat, p_lng, p.lat, p.lng) <= p_radius_km)
+  ),
+  m as (
+    select coalesce(exp(sum(ln(r.demand_multiplier))), 1) as mult
+    from public.area_rules r cross join i
+    where r.action = 'demand'
+      and public.area_rule_matches(r, p_item_id, i.category, p_state, p_district, (now() at time zone 'Asia/Kolkata')::date)
+  )
+  select pr.mandi, pr.shop, pr.source, pr.price_date, pr.area, d.qty, d.n, sup.qty, m.mult
+  from d cross join sup cross join m
+  left join lateral public.price_ref(p_item_id, p_state, p_district) pr on true
+$$;
+
+-- Household batches ----------------------------------------------------------------------------
+
+-- Recomputes a batch's load and savings ("room"); releases it once the room covers the trip, i.e.
+-- once the households together save more against the shop than the trip costs. (The design's
+-- break-even weight, trip / (shop - mandi), is the same test at the lowest fair price.)
+create or replace function public.refresh_batch(p_batch_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_b public.delivery_batches%rowtype;
+  v_s public.engine_settings%rowtype;
+  v_load numeric;
+  v_room numeric;
+begin
+  select * into v_b from public.delivery_batches where id = p_batch_id for update;
+  if not found or v_b.status <> 'open' then
+    return;
+  end if;
+  select * into v_s from public.engine_settings limit 1;
+
+  select
+    coalesce(sum(oi.quantity * public.unit_factor(oi.unit, i.base_unit)), 0),
+    -- Savings at the farmer's own price: (shop price - listed price) per base unit, never below 0.
+    coalesce(sum(oi.quantity * public.unit_factor(oi.unit, i.base_unit)
+      * case when pr.shop is null then v_b.trip_cost / v_s.fallback_break_even_kg
+             else greatest(pr.shop - oi.unit_price / public.unit_factor(oi.unit, i.base_unit), 0) end), 0)
+  into v_load, v_room
+  from public.orders o
+  join public.order_items oi on oi.order_id = o.id
+  join public.produce p on p.id = oi.produce_id
+  join public.items i on i.id = p.item_id
+  left join lateral public.price_ref(p.item_id, o.delivery_state, o.delivery_district) pr on true
+  where o.batch_id = p_batch_id and o.status = 'pooling';
+
+  update public.delivery_batches set load_qty = round(v_load, 2), room = round(v_room, 2) where id = p_batch_id;
+
+  if v_load = 0 then
+    update public.delivery_batches set status = 'cancelled' where id = p_batch_id;
+  elsif v_room >= v_b.trip_cost then
+    perform public.release_batch(p_batch_id, false);
+  end if;
+end;
+$$;
+
+-- Hands a batch to the farmer as one trip and splits the trip cost by each order's share of the load.
+create or replace function public.release_batch(p_batch_id uuid, p_below boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_b public.delivery_batches%rowtype;
+  v_order record;
+  v_now timestamptz := now();
+begin
+  select * into v_b from public.delivery_batches where id = p_batch_id for update;
+  if not found or v_b.status <> 'open' then
+    return;
+  end if;
+  for v_order in
+    select o.id, sum(oi.quantity * public.unit_factor(oi.unit, i.base_unit)) as load
+    from public.orders o
+    join public.order_items oi on oi.order_id = o.id
+    join public.produce p on p.id = oi.produce_id
+    join public.items i on i.id = p.item_id
+    where o.batch_id = p_batch_id and o.status = 'pooling'
+    group by o.id
+    order by o.id
+  loop
+    update public.orders
+    set status = 'placed',
+        delivery_fee = case when v_b.load_qty > 0 then round(v_b.trip_cost * v_order.load / v_b.load_qty, 2) else v_b.trip_cost end,
+        status_history = status_history || jsonb_build_array(jsonb_build_object('status', 'placed', 'at', v_now, 'by', 'system')),
+        updated_at = v_now
+    where id = v_order.id;
+  end loop;
+  update public.delivery_batches
+  set status = 'released', released_at = v_now, below_break_even = p_below
+  where id = p_batch_id;
+end;
+$$;
+
+-- Releases every batch whose collection window has closed; under-filled ones are flagged so the
+-- farmer can decide. Safe to call any time (pg_cron runs it every 10 minutes when available).
+create or replace function public.release_due_batches()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_n integer := 0;
+begin
+  for v_id in
+    select id from public.delivery_batches where status = 'open' and cutoff_at <= now() order by id for update skip locked
+  loop
+    perform public.refresh_batch(v_id);
+    if (select status from public.delivery_batches where id = v_id) = 'open' then
+      perform public.release_batch(v_id, true);
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Checkout preview: delivery fee per farmer, and for households how far their batch is from paying for itself.
+create or replace function public.quote_delivery(p_items jsonb, p_lat double precision, p_lng double precision, p_pincode text)
+returns table (
+  farmer_id uuid, distance_km numeric, trip_cost numeric, pooled boolean,
+  batch_load numeric, batch_room numeric, my_load numeric, my_room numeric,
+  fee_now numeric, ships_now boolean, cutoff_at timestamptz, problem text, problem_item text
+)
+language plpgsql stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_type public.consumer_type;
+  v_max numeric;
+  v_s public.engine_settings%rowtype;
+  v_state text;
+  v_district text;
+  r record;
+begin
+  select * into v_s from public.engine_settings limit 1;
+  select pr.consumer_type, bd.max_distance_km into v_type, v_max
+  from public.profiles pr left join public.buyer_details bd on bd.user_id = pr.id where pr.id = v_uid;
+  v_max := coalesce(v_max, case when v_type = 'industrial' then v_s.business_max_km else v_s.household_max_km end);
+  select a.state, a.district into v_state, v_district from public.addresses a where a.user_id = v_uid and a.is_default;
+
+  for r in
+    with lines as (
+      select (e ->> 'produce_id')::uuid as produce_id, sum((e ->> 'quantity')::numeric) as qty
+      from jsonb_array_elements(p_items) e group by 1
+    ),
+    j as (
+      select p.farmer_id, p.name, p.lat, p.lng, i.shelf_life_hours, p.item_id, p.category, p.harvested_at,
+        coalesce(p.delivery_radius_km, fd.delivery_radius_km, v_s.farmer_radius_km) as radius,
+        l.qty * public.unit_factor(p.unit, i.base_unit) as load,
+        public.geo_km(p_lat, p_lng, p.lat, p.lng) as dist,
+        case when pr.shop is null then null
+             else greatest(pr.shop - p.price_per_unit / public.unit_factor(p.unit, i.base_unit), 0) end as gap
+      from lines l
+      join public.produce p on p.id = l.produce_id
+      join public.items i on i.id = p.item_id
+      join public.farmer_details fd on fd.user_id = p.farmer_id
+      left join lateral public.price_ref(p.item_id, v_state, v_district) pr on true
+    )
+    select j.farmer_id,
+      max(j.dist) as dist,
+      sum(j.load) as load,
+      sum(j.load * coalesce(j.gap, 0)) as room_known,
+      sum(case when j.gap is null then j.load else 0 end) as load_unpriced,
+      max(case
+        when j.dist is null then 'no_location'
+        when j.dist > v_max or j.dist > j.radius then 'too_far'
+        when extract(epoch from (now() - j.harvested_at)) / 3600.0 + j.dist * v_s.road_factor / v_s.speed_kmph > v_s.freshness_limit * j.shelf_life_hours then 'not_fresh_on_arrival'
+      end) as problem,
+      max(case
+        when j.dist is null or j.dist > v_max or j.dist > j.radius
+          or extract(epoch from (now() - j.harvested_at)) / 3600.0 + j.dist * v_s.road_factor / v_s.speed_kmph > v_s.freshness_limit * j.shelf_life_hours
+        then j.name end) as problem_item
+    from j group by j.farmer_id
+  loop
+    farmer_id := r.farmer_id;
+    distance_km := case when r.dist is null then null else public.billing_km(r.dist) end;
+    trip_cost := case when r.dist is null then null else round(2 * v_s.road_factor * public.billing_km(r.dist) * v_s.cost_per_road_km, 2) end;
+    problem := r.problem;
+    problem_item := r.problem_item;
+    my_load := round(r.load, 2);
+    my_room := round(r.room_known + r.load_unpriced * coalesce(trip_cost / v_s.fallback_break_even_kg, 0), 2);
+    pooled := v_type is distinct from 'industrial';
+    batch_load := 0;
+    batch_room := 0;
+    cutoff_at := null;
+    if pooled then
+      select b.load_qty, b.room, b.cutoff_at into batch_load, batch_room, cutoff_at
+      from public.delivery_batches b
+      where b.farmer_id = r.farmer_id and b.pincode = p_pincode and b.status = 'open' and b.cutoff_at > now();
+      batch_load := coalesce(batch_load, 0);
+      batch_room := coalesce(batch_room, 0);
+      -- No open batch yet: this order would open one, closing one window from now.
+      cutoff_at := coalesce(cutoff_at, now() + make_interval(secs => (v_s.batch_window_hours * 3600)::double precision));
+      ships_now := trip_cost is not null and batch_room + my_room >= trip_cost;
+      fee_now := case when trip_cost is null then null else round(trip_cost * my_load / nullif(batch_load + my_load, 0), 2) end;
+    else
+      ships_now := true;
+      fee_now := trip_cost;
+    end if;
+    return next;
+  end loop;
+end;
+$$;
+
+-- place_order, now with the delivery rules, the delivery fee and household batches -------------
+-- p_items:    [{"produce_id": "...", "quantity": 4}, ...]   (quantity in the listing's unit)
+-- p_delivery: {"name","phone","line1","line2","village_city","district","state","pincode","lat","lng","notes"}
+-- Lock order everywhere: batch -> order -> produce, so concurrent calls cannot deadlock.
+create or replace function public.place_order(p_items jsonb, p_delivery jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_buyer public.profiles%rowtype;
+  v_max_km numeric;
+  v_s public.engine_settings%rowtype;
+  v_checkout uuid := gen_random_uuid();
+  v_now timestamptz := now();
+  v_day date := (now() at time zone 'Asia/Kolkata')::date;
+  v_lat double precision := nullif(p_delivery ->> 'lat', '')::double precision;
+  v_lng double precision := nullif(p_delivery ->> 'lng', '')::double precision;
+  v_pin text := trim(coalesce(p_delivery ->> 'pincode', ''));
+  v_pooled boolean;
+  v_farmer record;
+  v_line record;
+  v_prod public.produce%rowtype;
+  v_item public.items%rowtype;
+  v_batch public.delivery_batches%rowtype;
+  v_order_id uuid;
+  v_total numeric(14, 2);
+  v_km double precision;
+  v_bkm numeric;
+  v_trip numeric;
+  v_result jsonb := '[]'::jsonb;
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '28000';
+  end if;
+  select * into v_buyer from public.profiles where id = v_uid;
+  if not found or v_buyer.role <> 'consumer' then
+    raise exception 'only_buyers_can_order' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 50 then
+    raise exception 'invalid_cart' using errcode = '22023';
+  end if;
+  if coalesce(trim(p_delivery ->> 'name'), '') = ''
+     or coalesce(trim(p_delivery ->> 'phone'), '') !~ '^[0-9+ -]{7,16}$'
+     or coalesce(trim(p_delivery ->> 'line1'), '') = ''
+     or coalesce(trim(p_delivery ->> 'village_city'), '') = ''
+     or coalesce(trim(p_delivery ->> 'district'), '') = ''
+     or coalesce(trim(p_delivery ->> 'state'), '') = ''
+     or v_pin !~ '^[0-9]{6}$' then
+    raise exception 'invalid_delivery' using errcode = '22023';
+  end if;
+  if v_lat is null or v_lng is null then
+    raise exception 'location_required' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_items) e
+    left join public.produce p on p.id = (e ->> 'produce_id')::uuid
+    where p.id is null
+  ) then
+    raise exception 'unavailable' using errcode = 'P0001';
+  end if;
+
+  -- Batches whose window has closed are released first, so a new order never joins an expired one.
+  perform public.release_due_batches();
+
+  select * into v_s from public.engine_settings limit 1;
+  select coalesce(bd.max_distance_km, case when v_buyer.consumer_type = 'industrial' then v_s.business_max_km else v_s.household_max_km end)
+  into v_max_km from public.buyer_details bd where bd.user_id = v_uid;
+  v_max_km := coalesce(v_max_km, v_s.household_max_km);
+  v_pooled := v_buyer.consumer_type is distinct from 'industrial';
+
+  -- Households: open (or join) one batch per farmer for this PIN code, locked in farmer order.
+  if v_pooled then
+    for v_farmer in
+      select distinct p.farmer_id
+      from public.produce p
+      where p.id in (select (e ->> 'produce_id')::uuid from jsonb_array_elements(p_items) e)
+      order by p.farmer_id
+    loop
+      insert into public.delivery_batches (farmer_id, pincode, cutoff_at)
+      values (v_farmer.farmer_id, v_pin, v_now + make_interval(secs => (v_s.batch_window_hours * 3600)::double precision))
+      on conflict (farmer_id, pincode) where status = 'open' do nothing;
+      perform 1 from public.delivery_batches
+      where farmer_id = v_farmer.farmer_id and pincode = v_pin and status = 'open'
+      for update;
+    end loop;
+  end if;
+
+  perform 1
+  from public.produce
+  where id in (select (e ->> 'produce_id')::uuid from jsonb_array_elements(p_items) e)
+  order by id
+  for update;
+
+  for v_farmer in
+    select p.farmer_id, pr.full_name as farmer_name, pr.phone as farmer_phone,
+      min(p.lat) as lat, min(p.lng) as lng
+    from public.produce p
+    join public.profiles pr on pr.id = p.farmer_id
+    where p.id in (select (e ->> 'produce_id')::uuid from jsonb_array_elements(p_items) e)
+    group by p.farmer_id, pr.full_name, pr.phone
+    order by p.farmer_id
+  loop
+    if v_farmer.lat is null or v_farmer.lng is null then
+      raise exception 'out_of_range' using errcode = 'P0001';
+    end if;
+    v_km := public.geo_km(v_lat, v_lng, v_farmer.lat, v_farmer.lng);
+    v_bkm := public.billing_km(v_km);
+    v_trip := round(2 * v_s.road_factor * v_bkm * v_s.cost_per_road_km, 2);
+
+    if v_pooled then
+      select * into v_batch from public.delivery_batches
+      where farmer_id = v_farmer.farmer_id and pincode = v_pin and status = 'open';
+      if v_batch.drop_lat is null then
+        update public.delivery_batches
+        set drop_lat = v_lat, drop_lng = v_lng, distance_km = v_bkm, trip_cost = v_trip
+        where id = v_batch.id
+        returning * into v_batch;
+      end if;
+    end if;
+
+    insert into public.orders (
+      checkout_id, buyer_id, farmer_id, status,
+      delivery_name, delivery_phone, delivery_line1, delivery_line2, delivery_village_city,
+      delivery_district, delivery_state, delivery_pincode, delivery_lat, delivery_lng, delivery_notes,
+      buyer_name, buyer_type, farmer_name, farmer_phone, status_history,
+      batch_id, delivery_fee, distance_km
+    )
+    values (
+      v_checkout, v_uid, v_farmer.farmer_id,
+      case when v_pooled then 'pooling' else 'placed' end::public.order_status,
+      left(trim(p_delivery ->> 'name'), 120),
+      trim(p_delivery ->> 'phone'),
+      left(trim(p_delivery ->> 'line1'), 200),
+      nullif(left(trim(coalesce(p_delivery ->> 'line2', '')), 200), ''),
+      left(trim(p_delivery ->> 'village_city'), 120),
+      left(trim(p_delivery ->> 'district'), 120),
+      left(trim(p_delivery ->> 'state'), 80),
+      v_pin, v_lat, v_lng,
+      nullif(left(trim(coalesce(p_delivery ->> 'notes', '')), 500), ''),
+      coalesce(nullif(v_buyer.full_name, ''), left(trim(p_delivery ->> 'name'), 120)),
+      v_buyer.consumer_type,
+      v_farmer.farmer_name,
+      v_farmer.farmer_phone,
+      jsonb_build_array(jsonb_build_object('status', case when v_pooled then 'pooling' else 'placed' end, 'at', v_now, 'by', 'buyer')),
+      case when v_pooled then v_batch.id end,
+      case when v_pooled then 0 else v_trip end,
+      case when v_pooled then v_batch.distance_km else v_bkm end
+    )
+    returning id into v_order_id;
+
+    v_total := 0;
+    for v_line in
+      select (e ->> 'produce_id')::uuid as produce_id, sum((e ->> 'quantity')::numeric) as qty
+      from jsonb_array_elements(p_items) e
+      group by 1
+      order by 1
+    loop
+      select * into v_prod from public.produce where id = v_line.produce_id;
+      continue when v_prod.farmer_id <> v_farmer.farmer_id;
+      select * into v_item from public.items where id = v_prod.item_id;
+
+      if v_prod.status <> 'active' then
+        raise exception 'unavailable' using errcode = 'P0001', detail = v_prod.name;
+      end if;
+      if v_line.qty is null or v_line.qty <= 0 then
+        raise exception 'invalid_quantity' using errcode = '22023', detail = v_prod.name;
+      end if;
+      if v_line.qty < v_prod.min_order_qty then
+        raise exception 'below_min_order' using errcode = 'P0001', detail = v_prod.name, hint = v_prod.min_order_qty::text;
+      end if;
+      if v_line.qty > v_prod.qty_available then
+        raise exception 'insufficient_stock' using errcode = 'P0001', detail = v_prod.name, hint = v_prod.qty_available::text;
+      end if;
+      -- The same hard rules the market applies (step 2), so an order can't bypass them.
+      if v_s.require_verified and not coalesce((select verified from public.farmer_details where user_id = v_prod.farmer_id), false) then
+        raise exception 'unavailable' using errcode = 'P0001', detail = v_prod.name;
+      end if;
+      if v_km > v_max_km or v_km > coalesce(v_prod.delivery_radius_km,
+           (select delivery_radius_km from public.farmer_details where user_id = v_prod.farmer_id), v_s.farmer_radius_km) then
+        raise exception 'out_of_range' using errcode = 'P0001', detail = v_prod.name;
+      end if;
+      if extract(epoch from (v_now - v_prod.harvested_at)) / 3600.0 + v_km * v_s.road_factor / v_s.speed_kmph
+           > v_s.freshness_limit * v_item.shelf_life_hours then
+        raise exception 'not_fresh_on_arrival' using errcode = 'P0001', detail = v_prod.name;
+      end if;
+      if exists (
+        select 1 from public.area_rules r
+        where r.action = 'hide'
+          and public.area_rule_matches(r, v_prod.item_id, v_prod.category, trim(p_delivery ->> 'state'), trim(p_delivery ->> 'district'), v_day)
+      ) then
+        raise exception 'hidden_in_area' using errcode = 'P0001', detail = v_prod.name;
+      end if;
+
+      insert into public.order_items (order_id, produce_id, name, unit, unit_price, quantity)
+      values (v_order_id, v_prod.id, v_prod.name, v_prod.unit, v_prod.price_per_unit, v_line.qty);
+
+      -- Step 4: check and subtract in one step, under the row lock taken above.
+      update public.produce set qty_reserved = qty_reserved + v_line.qty where id = v_prod.id;
+
+      insert into public.produce_log (produce_id, farmer_id, change_type, quantity, order_id)
+      values (v_prod.id, v_prod.farmer_id, 'reserved', v_line.qty, v_order_id);
+
+      v_total := v_total + round(v_line.qty * v_prod.price_per_unit, 2);
+    end loop;
+
+    update public.orders set total = v_total where id = v_order_id;
+
+    if v_pooled then
+      perform public.refresh_batch(v_batch.id);
+      select * into v_batch from public.delivery_batches where id = v_batch.id;
+    end if;
+
+    v_result := v_result || jsonb_build_array(
+      (select jsonb_build_object(
+        'order_id', o.id, 'farmer_id', o.farmer_id, 'total', o.total, 'status', o.status,
+        'delivery_fee', o.delivery_fee, 'distance_km', o.distance_km,
+        'batch', case when v_pooled then jsonb_build_object(
+          'id', v_batch.id, 'status', v_batch.status, 'load_qty', v_batch.load_qty, 'room', v_batch.room,
+          'trip_cost', v_batch.trip_cost, 'cutoff_at', v_batch.cutoff_at) end)
+       from public.orders o where o.id = v_order_id));
+  end loop;
+
+  return jsonb_build_object('checkout_id', v_checkout, 'orders', v_result);
+end;
+$$;
+
+-- update_order_status, now with pooling, the promised delivery date and the farmer's record -----
+--   farmer: placed -> accepted | rejected; accepted -> packed | out_for_delivery | cancelled;
+--           packed -> out_for_delivery | cancelled; out_for_delivery -> delivered
+--   buyer:  pooling | placed | accepted -> cancelled
+-- Trust: every delivered order counts as completed, and as on time when it arrives by deliver_by;
+-- a farmer cancelling after accepting counts as completed but not on time.
+drop function if exists public.update_order_status(uuid, public.order_status);
+
+create or replace function public.update_order_status(p_order_id uuid, p_status public.order_status, p_deliver_by timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_batch_id uuid;
+  v_order public.orders%rowtype;
+  v_actor text;
+  v_ok boolean;
+  v_item record;
+  v_deliver_by timestamptz;
+begin
+  select batch_id into v_batch_id from public.orders where id = p_order_id;
+  if v_batch_id is not null then
+    perform 1 from public.delivery_batches where id = v_batch_id for update;
+  end if;
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'order_not_found' using errcode = 'P0002';
+  end if;
+
+  if v_uid is not null and v_uid = v_order.farmer_id then
+    v_actor := 'farmer';
+  elsif v_uid is not null and v_uid = v_order.buyer_id then
+    v_actor := 'buyer';
+  else
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+
+  v_ok := case v_actor
+    when 'farmer' then
+      (v_order.status = 'placed' and p_status in ('accepted', 'rejected'))
+      or (v_order.status = 'accepted' and p_status in ('packed', 'out_for_delivery', 'cancelled'))
+      or (v_order.status = 'packed' and p_status in ('out_for_delivery', 'cancelled'))
+      or (v_order.status = 'out_for_delivery' and p_status = 'delivered')
+    else
+      v_order.status in ('pooling', 'placed', 'accepted') and p_status = 'cancelled'
+  end;
+  if not v_ok then
+    raise exception 'invalid_transition' using errcode = '22023', detail = v_order.status::text || ' -> ' || p_status::text;
+  end if;
+
+  perform 1 from public.produce
+  where id in (select produce_id from public.order_items where order_id = p_order_id)
+  order by id
+  for update;
+
+  if p_status = 'delivered' then
+    for v_item in select * from public.order_items where order_id = p_order_id and produce_id is not null loop
+      update public.produce
+      set qty_reserved = greatest(qty_reserved - v_item.quantity, 0), qty_sold = qty_sold + v_item.quantity
+      where id = v_item.produce_id;
+      insert into public.produce_log (produce_id, farmer_id, change_type, quantity, order_id)
+      values (v_item.produce_id, v_order.farmer_id, 'sold', v_item.quantity, p_order_id);
+    end loop;
+    update public.farmer_details
+    set orders_completed = orders_completed + 1,
+        orders_on_time = orders_on_time + case when v_order.deliver_by is null or now() <= v_order.deliver_by then 1 else 0 end
+    where user_id = v_order.farmer_id;
+  elsif p_status in ('rejected', 'cancelled') then
+    for v_item in select * from public.order_items where order_id = p_order_id and produce_id is not null loop
+      update public.produce set qty_reserved = greatest(qty_reserved - v_item.quantity, 0) where id = v_item.produce_id;
+      insert into public.produce_log (produce_id, farmer_id, change_type, quantity, order_id)
+      values (v_item.produce_id, v_order.farmer_id, 'released', v_item.quantity, p_order_id);
+    end loop;
+    if v_actor = 'farmer' and p_status = 'cancelled' then
+      update public.farmer_details set orders_completed = orders_completed + 1 where user_id = v_order.farmer_id;
+    end if;
+  end if;
+
+  if p_status = 'accepted' then
+    v_deliver_by := coalesce(
+      p_deliver_by,
+      ((now() at time zone 'Asia/Kolkata')::date + 1 + time '20:00') at time zone 'Asia/Kolkata'
+    );
+    if v_deliver_by < now() then
+      raise exception 'deliver_by_in_past' using errcode = '22023';
+    end if;
+  end if;
+
+  update public.orders
+  set status = p_status,
+      status_history = status_history || jsonb_build_array(jsonb_build_object('status', p_status, 'at', now(), 'by', v_actor)),
+      delivered_at = case when p_status = 'delivered' then now() else delivered_at end,
+      deliver_by = coalesce(v_deliver_by, deliver_by),
+      updated_at = now()
+  where id = p_order_id;
+
+  -- A household leaving a batch shrinks it; an empty batch closes.
+  if v_order.status = 'pooling' and v_batch_id is not null then
+    perform public.refresh_batch(v_batch_id);
+  end if;
+
+  return (select to_jsonb(o) from public.orders o where o.id = p_order_id);
+end;
+$$;
+
+-- One action for a whole released trip: accept, reject, or move every order in it along together.
+create or replace function public.update_batch_status(p_batch_id uuid, p_status public.order_status, p_deliver_by timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_order record;
+  v_n integer := 0;
+begin
+  if not exists (select 1 from public.delivery_batches where id = p_batch_id and farmer_id = v_uid) then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+  for v_order in
+    select id, status from public.orders where batch_id = p_batch_id order by id
+  loop
+    if (v_order.status = 'placed' and p_status in ('accepted', 'rejected'))
+       or (v_order.status = 'accepted' and p_status in ('packed', 'out_for_delivery', 'cancelled'))
+       or (v_order.status = 'packed' and p_status in ('out_for_delivery', 'cancelled'))
+       or (v_order.status = 'out_for_delivery' and p_status = 'delivered') then
+      perform public.update_order_status(v_order.id, p_status, p_deliver_by);
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Listings: the item decides the category, the allowed units and the default name ---------------
+create or replace function public.produce_item_check()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_item public.items%rowtype;
+begin
+  select * into v_item from public.items where id = new.item_id;
+  if not found or not v_item.active then
+    raise exception 'unknown_item' using errcode = '22023';
+  end if;
+  if public.unit_factor(new.unit, v_item.base_unit) is null then
+    raise exception 'unit_not_allowed' using errcode = '22023';
+  end if;
+  if tg_op = 'UPDATE' and new.item_id is distinct from old.item_id and (old.qty_sold > 0 or old.qty_reserved > 0) then
+    raise exception 'item_locked' using errcode = '22023';
+  end if;
+  new.category := v_item.category;
+  if coalesce(trim(new.name), '') = '' then
+    new.name := v_item.name_en;
+  end if;
+  if new.harvested_at > now() + interval '1 hour' then
+    raise exception 'harvest_in_future' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger produce_item_check
+  before insert or update of item_id, unit, harvested_at on public.produce
+  for each row execute function public.produce_item_check();
+
+create or replace function public.demand_item_check()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.item_id is not null then
+    select category into new.category from public.items where id = new.item_id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger demand_item_check
+  before insert or update of item_id on public.demand_requests
+  for each row execute function public.demand_item_check();
+
+-- Release batches every 10 minutes where pg_cron is available (Supabase); harmless elsewhere.
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    create extension if not exists pg_cron;
+    perform cron.schedule('annsetu-release-batches', '*/10 * * * *', 'select public.release_due_batches()');
+  end if;
+exception when others then
+  raise notice 'pg_cron not set up: %', sqlerrm;
+end;
+$$;
+
+-- The farmer's demand panel: open buyer requests, the ones this farm can reach first.
+-- A request is reachable when it is within the farm's delivery radius and the buyer's distance
+-- limit; "ready" means the farmer already has a listing that could fill it and arrive fresh.
+create or replace function public.demand_for_farmer(p_limit integer default 50)
+returns table (
+  id uuid, item_id text, category public.produce_category, item_name text, quantity numeric, unit public.unit,
+  target_price numeric, needed_by date, notes text, district text, state text, created_at timestamptz,
+  buyer_type public.consumer_type, buyer_label text, distance_km numeric, can_reach boolean,
+  listing_id uuid, listing_available numeric, listing_unit public.unit, ready boolean
+)
+language sql stable
+security definer
+set search_path = ''
+as $$
+  with s as (select * from public.engine_settings limit 1),
+  me as (
+    select a.lat, a.lng, coalesce(fd.delivery_radius_km, s.farmer_radius_km)::float8 as radius
+    from public.addresses a
+    join public.farmer_details fd on fd.user_id = a.user_id
+    cross join s
+    where a.user_id = auth.uid() and a.is_default
+  ),
+  reqs as (
+    select d.*, pr.consumer_type,
+      case
+        when pr.consumer_type = 'industrial' then coalesce(nullif(trim(bd.business_name), ''), split_part(pr.full_name, ' ', 1))
+        else split_part(pr.full_name, ' ', 1)
+      end as label,
+      coalesce(bd.max_distance_km, case when pr.consumer_type = 'industrial' then s.business_max_km else s.household_max_km end)::float8 as buyer_max,
+      case when me.lat is not null and d.lat is not null then public.geo_km(me.lat, me.lng, d.lat, d.lng) end as dist,
+      me.radius
+    from public.demand_requests d
+    join public.profiles pr on pr.id = d.buyer_id
+    left join public.buyer_details bd on bd.user_id = d.buyer_id
+    cross join s
+    left join me on true
+    where d.status = 'open' and (d.needed_by is null or d.needed_by >= current_date)
+  )
+  select
+    r.id, r.item_id, r.category, r.item_name, r.quantity, r.unit, r.target_price, r.needed_by, r.notes,
+    r.district, r.state, r.created_at, r.consumer_type, r.label,
+    case when r.dist is null then null else public.billing_km(r.dist) end,
+    coalesce(r.dist <= r.radius and r.dist <= r.buyer_max, false),
+    l.id, l.qty_available, l.unit,
+    coalesce(l.id is not null and r.dist <= r.radius and r.dist <= r.buyer_max, false)
+  from reqs r
+  cross join s
+  left join lateral (
+    select p.id, p.qty_available, p.unit
+    from public.produce p
+    join public.items i on i.id = p.item_id
+    where p.farmer_id = auth.uid() and p.status = 'active' and r.item_id is not null and p.item_id = r.item_id
+      and p.qty_available * public.unit_factor(p.unit, i.base_unit) >= r.quantity * coalesce(public.unit_factor(r.unit, i.base_unit), 0)
+      and extract(epoch from (now() - p.harvested_at)) / 3600.0 + coalesce(r.dist, 0) * s.road_factor / s.speed_kmph <= s.freshness_limit * i.shelf_life_hours
+    order by p.qty_available desc
+    limit 1
+  ) l on true
+  order by 16 desc, 20 desc, r.dist asc nulls last, r.needed_by asc nulls last, r.created_at desc
+  limit greatest(1, least(coalesce(p_limit, 50), 200))
+$$;
+
+-- ===== 20261005000004_matching_security.sql =====
+
+-- Matching engine, part 3: who may read and call what. Same approach as before: start from
+-- nothing, then grant exactly what the app uses.
+
+alter table public.items enable row level security;
+alter table public.item_names enable row level security;
+alter table public.engine_settings enable row level security;
+alter table public.area_rules enable row level security;
+alter table public.reference_prices enable row level security;
+alter table public.delivery_batches enable row level security;
+
+-- Catalogue, settings, area rules and reference prices are public facts. Changes come from the
+-- dashboard / service role (the price feed), never from the browser.
+create policy "items: public read" on public.items for select to anon, authenticated using (true);
+create policy "item_names: public read" on public.item_names for select to anon, authenticated using (true);
+create policy "engine_settings: public read" on public.engine_settings for select to anon, authenticated using (true);
+create policy "area_rules: public read" on public.area_rules for select to anon, authenticated using (true);
+create policy "reference_prices: public read" on public.reference_prices for select to anon, authenticated using (true);
+
+-- A batch is visible to its farmer and to the buyers with an order in it.
+create policy "delivery_batches: parties read" on public.delivery_batches
+  for select to authenticated
+  using (
+    farmer_id = (select auth.uid())
+    or exists (select 1 from public.orders o where o.batch_id = delivery_batches.id and o.buyer_id = (select auth.uid()))
+  );
+
+revoke all on public.items, public.item_names, public.engine_settings, public.area_rules, public.reference_prices, public.delivery_batches
+  from anon, authenticated;
+grant select on public.items, public.item_names, public.engine_settings, public.area_rules, public.reference_prices to anon, authenticated;
+grant select on public.delivery_batches to authenticated;
+-- Only the daily price job (service role, never the browser) writes prices.
+grant select, insert, update on public.reference_prices to service_role;
+
+-- New columns the browser may write.
+grant insert (item_id, harvested_at, delivery_radius_km), update (item_id, harvested_at, delivery_radius_km) on public.produce to authenticated;
+grant insert (delivery_radius_km), update (delivery_radius_km) on public.farmer_details to authenticated;
+grant insert (max_distance_km), update (max_distance_km) on public.buyer_details to authenticated;
+grant insert (item_id), update (item_id) on public.demand_requests to authenticated;
+
+-- Functions: revoke everything (new functions get default execute), then grant the entry points.
+revoke execute on all functions in schema public from public, anon, authenticated;
+grant execute on function public.place_order(jsonb, jsonb) to authenticated;
+grant execute on function public.adjust_stock(uuid, public.ledger_type, numeric, text) to authenticated;
+grant execute on function public.update_order_status(uuid, public.order_status, timestamptz) to authenticated;
+grant execute on function public.update_batch_status(uuid, public.order_status, timestamptz) to authenticated;
+grant execute on function public.quote_delivery(jsonb, double precision, double precision, text) to authenticated;
+grant execute on function public.match_listings(text, numeric, double precision, double precision, public.consumer_type, numeric, text, text, public.produce_category, boolean, integer, integer, timestamptz) to anon, authenticated;
+grant execute on function public.match_hidden(text, numeric, double precision, double precision, public.consumer_type, numeric, text, text, timestamptz) to anon, authenticated;
+grant execute on function public.rate_inputs(text, double precision, double precision, numeric, text, text) to anon, authenticated;
+grant execute on function public.release_due_batches() to anon, authenticated;
+grant execute on function public.demand_for_farmer(integer) to authenticated;

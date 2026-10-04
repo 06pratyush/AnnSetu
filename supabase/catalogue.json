@@ -1,0 +1,1591 @@
+{
+  "note": "AnnSetu item catalogue. shelf_life_hours are rough estimates for ambient (unrefrigerated) storage; replace them with published storage tables when available. names: every spelling a buyer or farmer might type (English, Hindi in Latin letters, Hindi script). agmarknet: commodity names in the Agmarknet daily price feed, used to map mandi prices to items. sample_mandi: illustrative mandi prices (Rs per base unit) seeded as source='sample' so the app works before the live feed runs; they are not real quotes.",
+  "items": [
+    {
+      "id": "tomato",
+      "category": "vegetables",
+      "en": "Tomato",
+      "hi": "टमाटर",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "tomato",
+        "tomatoes",
+        "tomatoe",
+        "tamatar",
+        "tamaatar",
+        "tamater",
+        "tamato",
+        "टमाटर"
+      ],
+      "agmarknet": [
+        "Tomato"
+      ],
+      "sample_mandi": 15
+    },
+    {
+      "id": "potato",
+      "category": "vegetables",
+      "en": "Potato",
+      "hi": "आलू",
+      "unit": "kg",
+      "shelf_life_hours": 2160,
+      "names": [
+        "potato",
+        "potatoes",
+        "potatoe",
+        "aloo",
+        "alu",
+        "aaloo",
+        "batata",
+        "आलू"
+      ],
+      "agmarknet": [
+        "Potato"
+      ],
+      "sample_mandi": 12
+    },
+    {
+      "id": "onion",
+      "category": "vegetables",
+      "en": "Onion",
+      "hi": "प्याज",
+      "unit": "kg",
+      "shelf_life_hours": 1440,
+      "names": [
+        "onion",
+        "onions",
+        "pyaz",
+        "pyaaz",
+        "piyaz",
+        "pyaj",
+        "piaz",
+        "kanda",
+        "kaanda",
+        "प्याज",
+        "प्याज़",
+        "कांदा"
+      ],
+      "agmarknet": [
+        "Onion"
+      ],
+      "sample_mandi": 18
+    },
+    {
+      "id": "spinach",
+      "category": "vegetables",
+      "en": "Spinach",
+      "hi": "पालक",
+      "unit": "kg",
+      "shelf_life_hours": 24,
+      "names": [
+        "spinach",
+        "palak",
+        "paalak",
+        "पालक"
+      ],
+      "agmarknet": [
+        "Spinach"
+      ],
+      "sample_mandi": 15
+    },
+    {
+      "id": "cauliflower",
+      "category": "vegetables",
+      "en": "Cauliflower",
+      "hi": "फूलगोभी",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "cauliflower",
+        "gobhi",
+        "gobi",
+        "phool gobhi",
+        "phoolgobhi",
+        "phool gobi",
+        "phulgobi",
+        "फूलगोभी",
+        "फूल गोभी",
+        "गोभी"
+      ],
+      "agmarknet": [
+        "Cauliflower"
+      ],
+      "sample_mandi": 18
+    },
+    {
+      "id": "cabbage",
+      "category": "vegetables",
+      "en": "Cabbage",
+      "hi": "पत्ता गोभी",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "cabbage",
+        "patta gobhi",
+        "pattagobhi",
+        "band gobhi",
+        "bandgobhi",
+        "patta gobi",
+        "पत्ता गोभी",
+        "बंद गोभी",
+        "पत्तागोभी"
+      ],
+      "agmarknet": [
+        "Cabbage"
+      ],
+      "sample_mandi": 10
+    },
+    {
+      "id": "brinjal",
+      "category": "vegetables",
+      "en": "Brinjal",
+      "hi": "बैंगन",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "brinjal",
+        "eggplant",
+        "aubergine",
+        "baingan",
+        "bengan",
+        "baigan",
+        "vangi",
+        "vangan",
+        "बैंगन"
+      ],
+      "agmarknet": [
+        "Brinjal"
+      ],
+      "sample_mandi": 16
+    },
+    {
+      "id": "okra",
+      "category": "vegetables",
+      "en": "Okra (Lady finger)",
+      "hi": "भिंडी",
+      "unit": "kg",
+      "shelf_life_hours": 72,
+      "names": [
+        "okra",
+        "lady finger",
+        "ladyfinger",
+        "ladies finger",
+        "bhindi",
+        "bhendi",
+        "bhindee",
+        "भिंडी",
+        "भिण्डी"
+      ],
+      "agmarknet": [
+        "Bhindi(Ladies Finger)"
+      ],
+      "sample_mandi": 25
+    },
+    {
+      "id": "carrot",
+      "category": "vegetables",
+      "en": "Carrot",
+      "hi": "गाजर",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "carrot",
+        "carrots",
+        "gajar",
+        "gaajar",
+        "गाजर"
+      ],
+      "agmarknet": [
+        "Carrot"
+      ],
+      "sample_mandi": 20
+    },
+    {
+      "id": "green-chilli",
+      "category": "vegetables",
+      "en": "Green chilli",
+      "hi": "हरी मिर्च",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "green chilli",
+        "green chili",
+        "chilli",
+        "chili",
+        "hari mirch",
+        "harimirch",
+        "mirchi",
+        "mirch",
+        "हरी मिर्च",
+        "मिर्च",
+        "मिर्ची"
+      ],
+      "agmarknet": [
+        "Green Chilli"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "capsicum",
+      "category": "vegetables",
+      "en": "Capsicum",
+      "hi": "शिमला मिर्च",
+      "unit": "kg",
+      "shelf_life_hours": 168,
+      "names": [
+        "capsicum",
+        "bell pepper",
+        "shimla mirch",
+        "shimla mirchi",
+        "simla mirch",
+        "शिमला मिर्च"
+      ],
+      "agmarknet": [
+        "Capsicum"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "cucumber",
+      "category": "vegetables",
+      "en": "Cucumber",
+      "hi": "खीरा",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "cucumber",
+        "kheera",
+        "khira",
+        "kakdi",
+        "खीरा",
+        "ककड़ी"
+      ],
+      "agmarknet": [
+        "Cucumbar(Kheera)",
+        "Cucumber(Kheera)"
+      ],
+      "sample_mandi": 15
+    },
+    {
+      "id": "bottle-gourd",
+      "category": "vegetables",
+      "en": "Bottle gourd",
+      "hi": "लौकी",
+      "unit": "kg",
+      "shelf_life_hours": 168,
+      "names": [
+        "bottle gourd",
+        "lauki",
+        "louki",
+        "ghiya",
+        "doodhi",
+        "dudhi",
+        "लौकी",
+        "घीया"
+      ],
+      "agmarknet": [
+        "Bottle gourd"
+      ],
+      "sample_mandi": 12
+    },
+    {
+      "id": "bitter-gourd",
+      "category": "vegetables",
+      "en": "Bitter gourd",
+      "hi": "करेला",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "bitter gourd",
+        "karela",
+        "karella",
+        "करेला"
+      ],
+      "agmarknet": [
+        "Bitter gourd"
+      ],
+      "sample_mandi": 25
+    },
+    {
+      "id": "ridge-gourd",
+      "category": "vegetables",
+      "en": "Ridge gourd",
+      "hi": "तोरई",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "ridge gourd",
+        "turai",
+        "torai",
+        "tori",
+        "dodka",
+        "तोरई",
+        "तोरी"
+      ],
+      "agmarknet": [
+        "Ridgeguard(Tori)",
+        "Ridge gourd(Tori)"
+      ],
+      "sample_mandi": 22
+    },
+    {
+      "id": "pumpkin",
+      "category": "vegetables",
+      "en": "Pumpkin",
+      "hi": "कद्दू",
+      "unit": "kg",
+      "shelf_life_hours": 1440,
+      "names": [
+        "pumpkin",
+        "kaddu",
+        "kadu",
+        "lal kaddu",
+        "kashiphal",
+        "कद्दू"
+      ],
+      "agmarknet": [
+        "Pumpkin"
+      ],
+      "sample_mandi": 12
+    },
+    {
+      "id": "radish",
+      "category": "vegetables",
+      "en": "Radish",
+      "hi": "मूली",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "radish",
+        "mooli",
+        "muli",
+        "मूली"
+      ],
+      "agmarknet": [
+        "Raddish",
+        "Radish"
+      ],
+      "sample_mandi": 12
+    },
+    {
+      "id": "green-peas",
+      "category": "vegetables",
+      "en": "Green peas",
+      "hi": "मटर",
+      "unit": "kg",
+      "shelf_life_hours": 72,
+      "names": [
+        "green peas",
+        "peas",
+        "matar",
+        "mattar",
+        "mutter",
+        "hara matar",
+        "मटर",
+        "हरा मटर"
+      ],
+      "agmarknet": [
+        "Peas Wet",
+        "Green Peas"
+      ],
+      "sample_mandi": 35
+    },
+    {
+      "id": "beans",
+      "category": "vegetables",
+      "en": "French beans",
+      "hi": "बीन्स",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "beans",
+        "french beans",
+        "green beans",
+        "sem",
+        "phali",
+        "farasbi",
+        "बीन्स",
+        "सेम",
+        "फली"
+      ],
+      "agmarknet": [
+        "Beans",
+        "French Beans (Frasbean)"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "coriander-leaves",
+      "category": "vegetables",
+      "en": "Coriander leaves",
+      "hi": "हरा धनिया",
+      "unit": "kg",
+      "shelf_life_hours": 48,
+      "names": [
+        "coriander leaves",
+        "coriander",
+        "cilantro",
+        "dhaniya",
+        "dhania",
+        "hara dhaniya",
+        "kothimbir",
+        "kothmir",
+        "धनिया",
+        "हरा धनिया"
+      ],
+      "agmarknet": [
+        "Coriander(Leaves)"
+      ],
+      "sample_mandi": 40
+    },
+    {
+      "id": "methi-leaves",
+      "category": "vegetables",
+      "en": "Fenugreek leaves",
+      "hi": "मेथी",
+      "unit": "kg",
+      "shelf_life_hours": 36,
+      "names": [
+        "fenugreek leaves",
+        "fenugreek",
+        "methi",
+        "methi leaves",
+        "मेथी"
+      ],
+      "agmarknet": [
+        "Methi(Leaves)"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "garlic",
+      "category": "vegetables",
+      "en": "Garlic",
+      "hi": "लहसुन",
+      "unit": "kg",
+      "shelf_life_hours": 2160,
+      "names": [
+        "garlic",
+        "lahsun",
+        "lehsun",
+        "lasun",
+        "lasan",
+        "लहसुन"
+      ],
+      "agmarknet": [
+        "Garlic"
+      ],
+      "sample_mandi": 80
+    },
+    {
+      "id": "ginger",
+      "category": "vegetables",
+      "en": "Ginger",
+      "hi": "अदरक",
+      "unit": "kg",
+      "shelf_life_hours": 720,
+      "names": [
+        "ginger",
+        "adrak",
+        "adrakh",
+        "aadrak",
+        "अदरक"
+      ],
+      "agmarknet": [
+        "Ginger(Green)"
+      ],
+      "sample_mandi": 50
+    },
+    {
+      "id": "sweet-potato",
+      "category": "vegetables",
+      "en": "Sweet potato",
+      "hi": "शकरकंद",
+      "unit": "kg",
+      "shelf_life_hours": 720,
+      "names": [
+        "sweet potato",
+        "shakarkandi",
+        "shakarkand",
+        "shakarkandh",
+        "शकरकंद",
+        "शकरकंदी"
+      ],
+      "agmarknet": [
+        "Sweet Potato"
+      ],
+      "sample_mandi": 20
+    },
+    {
+      "id": "drumstick",
+      "category": "vegetables",
+      "en": "Drumstick",
+      "hi": "सहजन",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "drumstick",
+        "drumsticks",
+        "moringa",
+        "sahjan",
+        "sehjan",
+        "shevga",
+        "सहजन",
+        "सहजन फली"
+      ],
+      "agmarknet": [
+        "Drumstick"
+      ],
+      "sample_mandi": 40
+    },
+    {
+      "id": "beetroot",
+      "category": "vegetables",
+      "en": "Beetroot",
+      "hi": "चुकंदर",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "beetroot",
+        "beet",
+        "chukandar",
+        "chukander",
+        "चुकंदर"
+      ],
+      "agmarknet": [
+        "Beetroot"
+      ],
+      "sample_mandi": 20
+    },
+    {
+      "id": "spring-onion",
+      "category": "vegetables",
+      "en": "Spring onion",
+      "hi": "हरा प्याज",
+      "unit": "kg",
+      "shelf_life_hours": 48,
+      "names": [
+        "spring onion",
+        "green onion",
+        "hara pyaz",
+        "hari pyaaz",
+        "pyaz patti",
+        "हरा प्याज"
+      ],
+      "agmarknet": [
+        "Onion Green"
+      ],
+      "sample_mandi": 25
+    },
+    {
+      "id": "other-vegetable",
+      "category": "vegetables",
+      "en": "Other vegetable",
+      "hi": "अन्य सब्ज़ी",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "other vegetable",
+        "vegetable",
+        "sabzi",
+        "sabji",
+        "सब्ज़ी",
+        "सब्जी"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 20
+    },
+    {
+      "id": "banana",
+      "category": "fruits",
+      "en": "Banana",
+      "hi": "केला",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "banana",
+        "bananas",
+        "kela",
+        "kele",
+        "केला",
+        "केले"
+      ],
+      "agmarknet": [
+        "Banana",
+        "Banana - Green"
+      ],
+      "sample_mandi": 20
+    },
+    {
+      "id": "mango",
+      "category": "fruits",
+      "en": "Mango",
+      "hi": "आम",
+      "unit": "kg",
+      "shelf_life_hours": 168,
+      "names": [
+        "mango",
+        "mangoes",
+        "aam",
+        "aamba",
+        "keri",
+        "आम",
+        "केरी"
+      ],
+      "agmarknet": [
+        "Mango",
+        "Mango (Raw-Ripe)"
+      ],
+      "sample_mandi": 45
+    },
+    {
+      "id": "apple",
+      "category": "fruits",
+      "en": "Apple",
+      "hi": "सेब",
+      "unit": "kg",
+      "shelf_life_hours": 720,
+      "names": [
+        "apple",
+        "apples",
+        "seb",
+        "sev",
+        "saib",
+        "सेब"
+      ],
+      "agmarknet": [
+        "Apple"
+      ],
+      "sample_mandi": 70
+    },
+    {
+      "id": "grapes",
+      "category": "fruits",
+      "en": "Grapes",
+      "hi": "अंगूर",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "grapes",
+        "grape",
+        "angoor",
+        "angur",
+        "draksh",
+        "अंगूर"
+      ],
+      "agmarknet": [
+        "Grapes"
+      ],
+      "sample_mandi": 50
+    },
+    {
+      "id": "papaya",
+      "category": "fruits",
+      "en": "Papaya",
+      "hi": "पपीता",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "papaya",
+        "papita",
+        "papeeta",
+        "पपीता"
+      ],
+      "agmarknet": [
+        "Papaya",
+        "Papaya (Raw)"
+      ],
+      "sample_mandi": 18
+    },
+    {
+      "id": "guava",
+      "category": "fruits",
+      "en": "Guava",
+      "hi": "अमरूद",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "guava",
+        "amrood",
+        "amrud",
+        "peru",
+        "jamrukh",
+        "अमरूद"
+      ],
+      "agmarknet": [
+        "Guava"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "pomegranate",
+      "category": "fruits",
+      "en": "Pomegranate",
+      "hi": "अनार",
+      "unit": "kg",
+      "shelf_life_hours": 720,
+      "names": [
+        "pomegranate",
+        "anar",
+        "anaar",
+        "dalimb",
+        "अनार"
+      ],
+      "agmarknet": [
+        "Pomegranate"
+      ],
+      "sample_mandi": 80
+    },
+    {
+      "id": "orange",
+      "category": "fruits",
+      "en": "Orange",
+      "hi": "संतरा",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "orange",
+        "oranges",
+        "santra",
+        "santara",
+        "narangi",
+        "संतरा"
+      ],
+      "agmarknet": [
+        "Orange"
+      ],
+      "sample_mandi": 40
+    },
+    {
+      "id": "lemon",
+      "category": "fruits",
+      "en": "Lemon",
+      "hi": "नींबू",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "lemon",
+        "lime",
+        "nimbu",
+        "neembu",
+        "nimboo",
+        "limbu",
+        "नींबू",
+        "निंबू"
+      ],
+      "agmarknet": [
+        "Lemon",
+        "Lime"
+      ],
+      "sample_mandi": 40
+    },
+    {
+      "id": "watermelon",
+      "category": "fruits",
+      "en": "Watermelon",
+      "hi": "तरबूज",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "watermelon",
+        "water melon",
+        "tarbooz",
+        "tarbuj",
+        "tarbuz",
+        "kalingad",
+        "तरबूज",
+        "तरबूज़"
+      ],
+      "agmarknet": [
+        "Water Melon"
+      ],
+      "sample_mandi": 10
+    },
+    {
+      "id": "muskmelon",
+      "category": "fruits",
+      "en": "Muskmelon",
+      "hi": "खरबूजा",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "muskmelon",
+        "musk melon",
+        "kharbuja",
+        "kharbooja",
+        "kharbooza",
+        "खरबूजा"
+      ],
+      "agmarknet": [
+        "Karbuja(Musk Melon)"
+      ],
+      "sample_mandi": 18
+    },
+    {
+      "id": "pineapple",
+      "category": "fruits",
+      "en": "Pineapple",
+      "hi": "अनानास",
+      "unit": "kg",
+      "shelf_life_hours": 168,
+      "names": [
+        "pineapple",
+        "ananas",
+        "anannas",
+        "अनानास"
+      ],
+      "agmarknet": [
+        "Pineapple"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "sapota",
+      "category": "fruits",
+      "en": "Sapota (Chikoo)",
+      "hi": "चीकू",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "sapota",
+        "chikoo",
+        "chiku",
+        "cheeku",
+        "चीकू"
+      ],
+      "agmarknet": [
+        "Chikoos(Sapota)"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "coconut",
+      "category": "fruits",
+      "en": "Coconut",
+      "hi": "नारियल",
+      "unit": "piece",
+      "shelf_life_hours": 1440,
+      "names": [
+        "coconut",
+        "nariyal",
+        "nariyel",
+        "naral",
+        "नारियल"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 18
+    },
+    {
+      "id": "other-fruit",
+      "category": "fruits",
+      "en": "Other fruit",
+      "hi": "अन्य फल",
+      "unit": "kg",
+      "shelf_life_hours": 120,
+      "names": [
+        "other fruit",
+        "fruit",
+        "phal",
+        "फल"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 30
+    },
+    {
+      "id": "wheat",
+      "category": "grains",
+      "en": "Wheat",
+      "hi": "गेहूँ",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "wheat",
+        "gehu",
+        "gehun",
+        "gehoon",
+        "gehoo",
+        "gahu",
+        "गेहूँ",
+        "गेहूं",
+        "गेहू"
+      ],
+      "agmarknet": [
+        "Wheat"
+      ],
+      "sample_mandi": 24
+    },
+    {
+      "id": "rice",
+      "category": "grains",
+      "en": "Rice",
+      "hi": "चावल",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "rice",
+        "chawal",
+        "chaval",
+        "basmati",
+        "चावल"
+      ],
+      "agmarknet": [
+        "Rice"
+      ],
+      "sample_mandi": 32
+    },
+    {
+      "id": "paddy",
+      "category": "grains",
+      "en": "Paddy",
+      "hi": "धान",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "paddy",
+        "dhan",
+        "dhaan",
+        "धान"
+      ],
+      "agmarknet": [
+        "Paddy(Dhan)(Common)",
+        "Paddy(Dhan)(Basmati)"
+      ],
+      "sample_mandi": 22
+    },
+    {
+      "id": "maize",
+      "category": "grains",
+      "en": "Maize",
+      "hi": "मक्का",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "maize",
+        "corn",
+        "makka",
+        "makki",
+        "makai",
+        "मक्का",
+        "मक्की"
+      ],
+      "agmarknet": [
+        "Maize"
+      ],
+      "sample_mandi": 21
+    },
+    {
+      "id": "bajra",
+      "category": "grains",
+      "en": "Pearl millet (Bajra)",
+      "hi": "बाजरा",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "pearl millet",
+        "bajra",
+        "bajri",
+        "बाजरा"
+      ],
+      "agmarknet": [
+        "Bajra(Pearl Millet/Cumbu)"
+      ],
+      "sample_mandi": 24
+    },
+    {
+      "id": "jowar",
+      "category": "grains",
+      "en": "Sorghum (Jowar)",
+      "hi": "ज्वार",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "sorghum",
+        "jowar",
+        "jawar",
+        "juar",
+        "ज्वार"
+      ],
+      "agmarknet": [
+        "Jowar(Sorghum)"
+      ],
+      "sample_mandi": 30
+    },
+    {
+      "id": "ragi",
+      "category": "grains",
+      "en": "Finger millet (Ragi)",
+      "hi": "रागी",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "finger millet",
+        "ragi",
+        "nachni",
+        "mandua",
+        "रागी",
+        "मंडुआ"
+      ],
+      "agmarknet": [
+        "Ragi (Finger Millet)"
+      ],
+      "sample_mandi": 35
+    },
+    {
+      "id": "barley",
+      "category": "grains",
+      "en": "Barley",
+      "hi": "जौ",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "barley",
+        "jau",
+        "जौ"
+      ],
+      "agmarknet": [
+        "Barley (Jau)"
+      ],
+      "sample_mandi": 22
+    },
+    {
+      "id": "other-grain",
+      "category": "grains",
+      "en": "Other grain",
+      "hi": "अन्य अनाज",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "other grain",
+        "grain",
+        "anaj",
+        "अनाज"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 25
+    },
+    {
+      "id": "chana",
+      "category": "pulses",
+      "en": "Chickpea (Chana)",
+      "hi": "चना",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "chickpea",
+        "chickpeas",
+        "gram",
+        "chana",
+        "channa",
+        "kabuli chana",
+        "chana dal",
+        "चना",
+        "चने"
+      ],
+      "agmarknet": [
+        "Bengal Gram(Gram)(Whole)",
+        "Kabuli Chana(Chickpeas-White)"
+      ],
+      "sample_mandi": 55
+    },
+    {
+      "id": "tur",
+      "category": "pulses",
+      "en": "Pigeon pea (Tur)",
+      "hi": "अरहर",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "pigeon pea",
+        "tur",
+        "toor",
+        "toor dal",
+        "tuar",
+        "arhar",
+        "arhar dal",
+        "अरहर",
+        "तुअर",
+        "तूर"
+      ],
+      "agmarknet": [
+        "Arhar (Tur/Red Gram)(Whole)"
+      ],
+      "sample_mandi": 90
+    },
+    {
+      "id": "moong",
+      "category": "pulses",
+      "en": "Green gram (Moong)",
+      "hi": "मूंग",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "green gram",
+        "moong",
+        "mung",
+        "moong dal",
+        "मूंग",
+        "मूँग"
+      ],
+      "agmarknet": [
+        "Green Gram (Moong)(Whole)"
+      ],
+      "sample_mandi": 80
+    },
+    {
+      "id": "urad",
+      "category": "pulses",
+      "en": "Black gram (Urad)",
+      "hi": "उड़द",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "black gram",
+        "urad",
+        "urd",
+        "urad dal",
+        "उड़द",
+        "उरद"
+      ],
+      "agmarknet": [
+        "Black Gram (Urd Beans)(Whole)"
+      ],
+      "sample_mandi": 75
+    },
+    {
+      "id": "masoor",
+      "category": "pulses",
+      "en": "Lentil (Masoor)",
+      "hi": "मसूर",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "lentil",
+        "lentils",
+        "masoor",
+        "masur",
+        "masoor dal",
+        "मसूर"
+      ],
+      "agmarknet": [
+        "Lentil (Masur)(Whole)"
+      ],
+      "sample_mandi": 60
+    },
+    {
+      "id": "rajma",
+      "category": "pulses",
+      "en": "Kidney beans (Rajma)",
+      "hi": "राजमा",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "kidney beans",
+        "rajma",
+        "rajmah",
+        "राजमा"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 90
+    },
+    {
+      "id": "other-pulse",
+      "category": "pulses",
+      "en": "Other pulse",
+      "hi": "अन्य दाल",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "other pulse",
+        "pulse",
+        "dal",
+        "daal",
+        "दाल"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 70
+    },
+    {
+      "id": "turmeric",
+      "category": "spices",
+      "en": "Turmeric",
+      "hi": "हल्दी",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "turmeric",
+        "haldi",
+        "halad",
+        "हल्दी"
+      ],
+      "agmarknet": [
+        "Turmeric"
+      ],
+      "sample_mandi": 120
+    },
+    {
+      "id": "dry-chilli",
+      "category": "spices",
+      "en": "Dry red chilli",
+      "hi": "लाल मिर्च",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "dry chilli",
+        "red chilli",
+        "dry red chilli",
+        "lal mirch",
+        "sukhi mirch",
+        "लाल मिर्च",
+        "सूखी मिर्च"
+      ],
+      "agmarknet": [
+        "Dry Chillies"
+      ],
+      "sample_mandi": 140
+    },
+    {
+      "id": "coriander-seed",
+      "category": "spices",
+      "en": "Coriander seed",
+      "hi": "धनिया बीज",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "coriander seed",
+        "coriander seeds",
+        "dhaniya beej",
+        "sukha dhaniya",
+        "धनिया बीज",
+        "साबुत धनिया"
+      ],
+      "agmarknet": [
+        "Corriander seed",
+        "Coriander seed"
+      ],
+      "sample_mandi": 70
+    },
+    {
+      "id": "cumin",
+      "category": "spices",
+      "en": "Cumin",
+      "hi": "जीरा",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "cumin",
+        "jeera",
+        "jira",
+        "zeera",
+        "जीरा"
+      ],
+      "agmarknet": [
+        "Cummin Seed(Jeera)"
+      ],
+      "sample_mandi": 220
+    },
+    {
+      "id": "black-pepper",
+      "category": "spices",
+      "en": "Black pepper",
+      "hi": "काली मिर्च",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "black pepper",
+        "pepper",
+        "kali mirch",
+        "kaali mirch",
+        "काली मिर्च"
+      ],
+      "agmarknet": [
+        "Black pepper"
+      ],
+      "sample_mandi": 500
+    },
+    {
+      "id": "other-spice",
+      "category": "spices",
+      "en": "Other spice",
+      "hi": "अन्य मसाला",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "other spice",
+        "spice",
+        "masala",
+        "मसाला"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 150
+    },
+    {
+      "id": "groundnut",
+      "category": "oilseeds",
+      "en": "Groundnut",
+      "hi": "मूंगफली",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "groundnut",
+        "peanut",
+        "peanuts",
+        "moongphali",
+        "mungfali",
+        "moongfali",
+        "shengdana",
+        "मूंगफली",
+        "मूँगफली"
+      ],
+      "agmarknet": [
+        "Groundnut",
+        "Groundnut (Split)"
+      ],
+      "sample_mandi": 55
+    },
+    {
+      "id": "mustard",
+      "category": "oilseeds",
+      "en": "Mustard seed",
+      "hi": "सरसों",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "mustard",
+        "mustard seed",
+        "sarson",
+        "sarso",
+        "rai",
+        "सरसों",
+        "राई"
+      ],
+      "agmarknet": [
+        "Mustard"
+      ],
+      "sample_mandi": 55
+    },
+    {
+      "id": "soybean",
+      "category": "oilseeds",
+      "en": "Soybean",
+      "hi": "सोयाबीन",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "soybean",
+        "soyabean",
+        "soya",
+        "soy",
+        "सोयाबीन"
+      ],
+      "agmarknet": [
+        "Soyabean"
+      ],
+      "sample_mandi": 42
+    },
+    {
+      "id": "sesame",
+      "category": "oilseeds",
+      "en": "Sesame",
+      "hi": "तिल",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "sesame",
+        "til",
+        "gingelly",
+        "तिल"
+      ],
+      "agmarknet": [
+        "Sesamum(Sesame,Gingelly,Til)"
+      ],
+      "sample_mandi": 120
+    },
+    {
+      "id": "sunflower-seed",
+      "category": "oilseeds",
+      "en": "Sunflower seed",
+      "hi": "सूरजमुखी",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "sunflower",
+        "sunflower seed",
+        "surajmukhi",
+        "सूरजमुखी"
+      ],
+      "agmarknet": [
+        "Sunflower"
+      ],
+      "sample_mandi": 55
+    },
+    {
+      "id": "other-oilseed",
+      "category": "oilseeds",
+      "en": "Other oilseed",
+      "hi": "अन्य तिलहन",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "other oilseed",
+        "oilseed",
+        "tilhan",
+        "तिलहन"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 50
+    },
+    {
+      "id": "milk",
+      "category": "dairy",
+      "en": "Milk",
+      "hi": "दूध",
+      "unit": "litre",
+      "shelf_life_hours": 24,
+      "names": [
+        "milk",
+        "cow milk",
+        "buffalo milk",
+        "doodh",
+        "dudh",
+        "दूध"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 40
+    },
+    {
+      "id": "curd",
+      "category": "dairy",
+      "en": "Curd",
+      "hi": "दही",
+      "unit": "kg",
+      "shelf_life_hours": 48,
+      "names": [
+        "curd",
+        "yogurt",
+        "yoghurt",
+        "dahi",
+        "dahee",
+        "दही"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 60
+    },
+    {
+      "id": "paneer",
+      "category": "dairy",
+      "en": "Paneer",
+      "hi": "पनीर",
+      "unit": "kg",
+      "shelf_life_hours": 72,
+      "names": [
+        "paneer",
+        "cottage cheese",
+        "panir",
+        "पनीर"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 280
+    },
+    {
+      "id": "ghee",
+      "category": "dairy",
+      "en": "Ghee",
+      "hi": "घी",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "ghee",
+        "ghi",
+        "desi ghee",
+        "घी"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 550
+    },
+    {
+      "id": "butter",
+      "category": "dairy",
+      "en": "Butter",
+      "hi": "मक्खन",
+      "unit": "kg",
+      "shelf_life_hours": 336,
+      "names": [
+        "butter",
+        "makhan",
+        "makkhan",
+        "loni",
+        "मक्खन"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 450
+    },
+    {
+      "id": "other-dairy",
+      "category": "dairy",
+      "en": "Other dairy",
+      "hi": "अन्य डेयरी",
+      "unit": "kg",
+      "shelf_life_hours": 48,
+      "names": [
+        "other dairy",
+        "dairy",
+        "डेयरी"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 60
+    },
+    {
+      "id": "jaggery",
+      "category": "others",
+      "en": "Jaggery (Gur)",
+      "hi": "गुड़",
+      "unit": "kg",
+      "shelf_life_hours": 4320,
+      "names": [
+        "jaggery",
+        "gur",
+        "gud",
+        "गुड़",
+        "गुड"
+      ],
+      "agmarknet": [
+        "Gur(Jaggery)"
+      ],
+      "sample_mandi": 40
+    },
+    {
+      "id": "honey",
+      "category": "others",
+      "en": "Honey",
+      "hi": "शहद",
+      "unit": "kg",
+      "shelf_life_hours": 8760,
+      "names": [
+        "honey",
+        "shahad",
+        "shehad",
+        "madhu",
+        "शहद"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 250
+    },
+    {
+      "id": "other",
+      "category": "others",
+      "en": "Other produce",
+      "hi": "अन्य उपज",
+      "unit": "kg",
+      "shelf_life_hours": 96,
+      "names": [
+        "other",
+        "other produce",
+        "anya",
+        "अन्य"
+      ],
+      "agmarknet": [],
+      "sample_mandi": 30
+    }
+  ]
+}

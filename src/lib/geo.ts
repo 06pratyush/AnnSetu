@@ -41,7 +41,8 @@ export async function reverseGeocode({ lat, lng }: LatLng, lang: "en" | "hi"): P
     line1: line1 || undefined,
     line2: a.neighbourhood ?? a.suburb ?? a.quarter ?? undefined,
     village_city: a.village ?? a.town ?? a.city ?? a.municipality ?? a.hamlet ?? undefined,
-    district: a.state_district ?? a.county ?? a.city_district ?? undefined,
+    // "Pune District" → "Pune", the spelling mandi price records use.
+    district: (a.state_district ?? a.county ?? a.city_district)?.replace(/\s+district$/i, "") ?? undefined,
     state: a.state ?? undefined,
     pincode: a.postcode?.replace(/\s/g, "").slice(0, 6) ?? undefined,
     lat,

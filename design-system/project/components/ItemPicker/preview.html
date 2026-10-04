@@ -1,0 +1,13 @@
+<!-- @dsCard group="Matching" height=400 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  const index = React.useMemo(function () { return A.indexCatalogue(A.SEED_CATALOGUE); }, []);
+  const st = React.useState(null);
+  return h(A.RoleScope, { role: "farmer" }, h("div", { className: "flex max-w-md flex-col gap-2 pb-72" },
+    h("p", { className: "text-small text-ink-muted" }, "Try tamatr, pyaz, bhindi or टमाटर"),
+    h(A.ItemPicker, { index: index, value: st[0], onChange: st[1], placeholder: "e.g. Tomato" })));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

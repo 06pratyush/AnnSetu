@@ -17,9 +17,10 @@ jobs:
     steps:
       - name: Read one market listing
         env:
-          URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Supabase not set up yet; nothing to keep awake."; exit 0; fi
           code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/market_listings?select=id&limit=1" -H "apikey: $KEY")
           echo "Supabase answered $code"
           test "$code" = "200"

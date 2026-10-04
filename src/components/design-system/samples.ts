@@ -1,5 +1,5 @@
 // Example data for the living style guide and the design-system previews. Never shown as real records.
-import type { CartLine, FarmerPublic, LedgerEntry, MarketListing, OpenDemand, Order, Produce } from "@/lib/types";
+import type { CartLine, DeliveryBatch, FarmerDemand, FarmerPublic, LedgerEntry, MarketListing, MatchRow, OpenDemand, Order, Produce } from "@/lib/types";
 
 const now = Date.now();
 const ago = (h: number) => new Date(now - h * 3600_000).toISOString();
@@ -7,6 +7,9 @@ const ago = (h: number) => new Date(now - h * 3600_000).toISOString();
 export const sampleProduce: Produce = {
   id: "00000000-0000-0000-0000-00000000a001",
   farmer_id: "farmer-1",
+  item_id: "tomato",
+  harvested_at: ago(14),
+  delivery_radius_km: null,
   category: "vegetables",
   name: "Tomato",
   variety: "Desi",
@@ -73,6 +76,53 @@ export const sampleListing: MarketListing = {
   farmer_avatar: null,
   farmer_rating: 4.6,
   farmer_ratings_count: 18,
+  item_id: "tomato",
+  harvested_at: ago(14),
+  farmer_verified: true,
+  orders_completed: 41,
+  orders_on_time: 38,
+};
+
+/** A match_listings row: the Case 1 restaurant looking at a farm 20 km away. */
+export const sampleMatch: MatchRow = {
+  ...sampleListing,
+  price_per_unit: 24.9,
+  min_order_qty: 5,
+  qty_available: 180,
+  farmer_avatar: null,
+  farmer_verified: true,
+  farmer_ratings_count: 18,
+  orders_completed: 41,
+  orders_on_time: 38,
+  distance_km: 20,
+  travel_hours: 0.9,
+  hours_used: 14.9,
+  shelf_life_hours: 120,
+  price_base: 24.9,
+  shop_price: 45,
+  trip_cost: 520,
+  part_price: 0.947,
+  part_fresh: 0.876,
+  part_near: 0.8,
+  part_trust: 0.904,
+  part_fill: 1,
+  score: 0.8946,
+  total_count: 12,
+};
+
+export const sampleBatch: DeliveryBatch = {
+  id: "batch-1",
+  farmer_id: "farmer-1",
+  pincode: "302001",
+  distance_km: 20,
+  trip_cost: 520,
+  status: "open",
+  load_qty: 15,
+  room: 339.75,
+  below_break_even: false,
+  opened_at: ago(3),
+  cutoff_at: new Date(now + 21 * 3600_000).toISOString(),
+  released_at: null,
 };
 
 export const sampleFarmer: FarmerPublic = {
@@ -87,6 +137,9 @@ export const sampleFarmer: FarmerPublic = {
   avg_rating: 4.6,
   ratings_count: 18,
   member_since: "2026-03-14T00:00:00Z",
+  verified: true,
+  orders_completed: 41,
+  orders_on_time: 38,
 };
 
 export const sampleOrder: Order = {
@@ -115,6 +168,10 @@ export const sampleOrder: Order = {
   status_history: [{ status: "placed", at: ago(1), by: "buyer" }],
   created_at: ago(1),
   updated_at: ago(1),
+  batch_id: null,
+  delivery_fee: 520,
+  distance_km: 20,
+  deliver_by: null,
   order_items: [
     { id: "i1", order_id: "o1", produce_id: sampleProduce.id, name: "Tomato", unit: "kg", unit_price: 32, quantity: 20 },
     { id: "i2", order_id: "o1", produce_id: "p2", name: "Onion", unit: "kg", unit_price: 24, quantity: 60 },
@@ -136,6 +193,7 @@ export const sampleOrderInTransit: Order = {
 export const sampleDemand: OpenDemand = {
   id: "d1",
   buyer_id: "buyer-1",
+  item_id: "onion",
   category: "vegetables",
   item_name: "Onion",
   quantity: 500,
@@ -152,6 +210,13 @@ export const sampleDemand: OpenDemand = {
   approx_lat: 18.52,
   approx_lng: 73.85,
 };
+
+/** demand_for_farmer rows: one this farm can fill now, one it can reach, one out of reach. */
+export const sampleFarmerDemand: FarmerDemand[] = [
+  { ...sampleDemand, buyer_type: "industrial", distance_km: 12, can_reach: true, listing_id: "p9", listing_available: 650, listing_unit: "kg", ready: true },
+  { ...sampleDemand, id: "d2", item_id: "green-chilli", item_name: "Green chilli", quantity: 40, buyer_type: "individual", buyer_label: "Sam", target_price: null, notes: null, distance_km: 8, can_reach: true, listing_id: null, listing_available: null, listing_unit: null, ready: false },
+  { ...sampleDemand, id: "d3", item_id: "spinach", item_name: "Spinach", quantity: 25, buyer_type: "industrial", buyer_label: "Green Leaf Cafe", target_price: 30, notes: null, distance_km: 64, can_reach: false, listing_id: null, listing_available: null, listing_unit: null, ready: false },
+];
 
 export const sampleLedger: LedgerEntry[] = [
   { id: "l5", produce_id: sampleProduce.id, change_type: "sold", quantity: 20, note: null, order_id: sampleOrder.id, created_at: ago(2) },

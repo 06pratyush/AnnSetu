@@ -41,7 +41,8 @@
     "skipToContent": "Skip to content",
     "previous": "Previous",
     "page": "Page {{page}}",
-    "example": "Example"
+    "example": "Example",
+    "change": "Change"
   },
   "nav": {
     "home": "Home",
@@ -150,7 +151,13 @@
       "processor": "Food processor or mill",
       "institution": "Hostel, canteen or institution",
       "other": "Other"
-    }
+    },
+    "pinRequired": "Set your exact spot on the map: tap it or use your location.",
+    "radius": "How far you deliver",
+    "radiusHint": "Usual distance you will travel to a buyer. Default {{km}} km.",
+    "reach": "Buying distance",
+    "maxKm": "Farthest farm you'll buy from",
+    "maxKmHint": "Farther farms can't reach you fresh or cheaply. Default {{km}} km."
   },
   "location": {
     "useGps": "Use my location",
@@ -259,7 +266,13 @@
     "notFound": "This listing doesn't exist or isn't yours.",
     "about": "About the produce",
     "pricing": "Price and quantity",
-    "freshness": "Freshness and photos"
+    "freshness": "Freshness and photos",
+    "itemHint": "Type any name: tomato, tamatar or टमाटर.",
+    "itemLocked": "The item can't change once this listing has orders.",
+    "harvestedAt": "Picked or harvested at",
+    "freshUntil": "Shown to buyers until about {{when}}, while it can still arrive fresh.",
+    "radius": "How far you deliver",
+    "radiusHint": "Leave empty to use your usual {{km}} km."
   },
   "ledger": {
     "title": "Stock log",
@@ -329,7 +342,8 @@
       "packed": "Packed",
       "out_for_delivery": "Out for delivery",
       "delivered": "Delivered",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "pooling": "Waiting for neighbours"
     },
     "accept": "Accept order",
     "reject": "Reject",
@@ -362,7 +376,24 @@
     "reviewPlaceholder": "What was good, and what could be better?",
     "submitReview": "Submit rating",
     "note": "Note from buyer",
-    "transitionError": "This order changed in the meantime. Refresh to see its latest status."
+    "transitionError": "This order changed in the meantime. Refresh to see its latest status.",
+    "delivery": "Delivery",
+    "deliveryPending": "shared, set when the trip ships",
+    "poolingTitle": "Sharing a trip with neighbours",
+    "promisedBy": "Promised by {{when}}",
+    "acceptTitle": "Accept and promise a delivery time",
+    "acceptBody": "Buyers see this time. Delivering by it counts towards your on-time record.",
+    "deliverBy": "Deliver by",
+    "acceptTrip": "Accept trip",
+    "rejectTrip": "Reject trip",
+    "tripTitle_one": "Trip to PIN {{pin}} · {{count}} home",
+    "tripTitle_other": "Trip to PIN {{pin}} · {{count}} homes",
+    "tripMeta": "{{km}} km · {{load}} kg · delivery {{fee}} in total, shared by the homes",
+    "belowBreakEven": "This trip closed at its cut-off before the homes' savings covered it. Accept only if the trip still suits you.",
+    "formingTitle_one": "{{count}} shared trip forming",
+    "formingTitle_other": "{{count}} shared trips forming",
+    "formingBody": "Household orders wait here until together they pay for the trip, or until the cut-off.",
+    "formingTo": "To PIN {{pin}}"
   },
   "market": {
     "title": "Market",
@@ -441,7 +472,21 @@
     "belowMin": "{{name}} needs a bigger order. Check the minimum and try again.",
     "unavailable": "{{name}} is no longer on sale. Remove it from your cart.",
     "ownProduce": "You can't order your own produce.",
-    "needLocation": "Set a delivery address first."
+    "needLocation": "Set a delivery address first.",
+    "deliveryTitle": "Delivery",
+    "needPin": "Set your delivery spot on the map: tap it or use your location.",
+    "oneTrip": "One trip of {{km}} km there and back, paid to the farmer with the order.",
+    "sharedWaiting": "Shared with other homes in your PIN code: a {{km}} km trip costing {{trip}} in all. Your share falls as neighbours join.",
+    "sharedShipsNow": "Your order completes a shared {{km}} km trip ({{trip}} in all). It goes to the farmer now.",
+    "pooledNote_one": "1 order is waiting to share a trip with neighbours.",
+    "pooledNote_other": "{{count}} orders are waiting to share trips with neighbours.",
+    "problem": {
+      "too_far": "{{name}} is outside this farm's delivery area or your buying distance.",
+      "out_of_range": "{{name}} is outside this farm's delivery area or your buying distance.",
+      "no_location": "This farm has no location yet, so it can't deliver.",
+      "not_fresh_on_arrival": "{{name}} wouldn't arrive fresh at your address.",
+      "hidden_in_area": "{{name}} isn't offered in your area today."
+    }
   },
   "requirements": {
     "title": "Requirements",
@@ -482,7 +527,10 @@
     "topRequested": "Most requested",
     "requests_one": "{{count}} request",
     "requests_other": "{{count}} requests",
-    "postedBy": "{{type}} · {{place}}"
+    "postedBy": "{{type}} · {{place}}",
+    "ready": "You can fill this now: {{qty}} listed",
+    "canReach": "Within your delivery area",
+    "outOfReach": "Outside your delivery area"
   },
   "profile": {
     "title": "Profile",
@@ -530,6 +578,93 @@
     "configMissing": "AnnSetu isn't connected to its database yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then rebuild.",
     "wrongRole": "This page is for {{role}} accounts.",
     "goToMyHome": "Go to my home",
-    "configTitle": "Not connected to the database yet"
+    "configTitle": "Not connected to the database yet",
+    "harvestFuture": "The harvest time can't be in the future.",
+    "unknown_item": "Choose the produce from the list.",
+    "unit_not_allowed": "That unit doesn't fit this produce. Pick another.",
+    "item_locked": "The item can't change once this listing has orders.",
+    "harvest_in_future": "The harvest time can't be in the future.",
+    "deliver_by_in_past": "Pick a delivery time that hasn't passed."
+  },
+  "matching": {
+    "marketSubtitle": "Produce from farms that can reach you fresh, best match first.",
+    "didYouMean": "Did you mean",
+    "noItem": "No produce matches that. Try another spelling.",
+    "showingFor": "Showing farms for",
+    "howMuch": "How much do you need?",
+    "bestMatch": "Best match",
+    "useLocation": "Show farms near me",
+    "withinKm": "Farms within {{km}} km of you",
+    "sharedDelivery": "Delivery shared with neighbours",
+    "emptyForItem": "No farm near you has this right now. Post a requirement and farmers will see it.",
+    "newFarmer": "New farmer",
+    "onTime_one": "{{pct}}% on time · {{count}} order",
+    "onTime_other": "{{pct}}% on time · {{count}} orders",
+    "picked": "Picked {{when}}",
+    "freshLeft": "{{pct}}% fresh on arrival",
+    "kmAway": "{{km}} km away",
+    "verified": "Verified",
+    "withDelivery": "{{price}} with delivery",
+    "tripCost": "trip {{cost}}",
+    "why": "Why this order?",
+    "scoreNote": "Match score {{score}} of 100. Bars show each part; their weights depend on whether you buy for a home or a business.",
+    "part": {
+      "price": "Price",
+      "fresh": "Freshness",
+      "near": "Nearness",
+      "trust": "On time",
+      "fill": "Fills order"
+    },
+    "hidden_one": "{{count}} listing hidden:",
+    "hidden_other": "{{count}} listings hidden:",
+    "reason": {
+      "unverified_one": "{{count}} not verified",
+      "unverified_other": "{{count}} not verified",
+      "no_location_one": "{{count}} has no location",
+      "no_location_other": "{{count}} have no location",
+      "too_far_one": "{{count}} too far",
+      "too_far_other": "{{count}} too far",
+      "below_min_order_one": "{{count}} needs a bigger order",
+      "below_min_order_other": "{{count}} need a bigger order",
+      "not_enough_stock_one": "{{count}} has too little stock",
+      "not_enough_stock_other": "{{count}} have too little stock",
+      "not_fresh_on_arrival_one": "{{count}} wouldn't arrive fresh",
+      "not_fresh_on_arrival_other": "{{count}} wouldn't arrive fresh",
+      "hidden_in_area_one": "{{count}} not offered in your area today",
+      "hidden_in_area_other": "{{count}} not offered in your area today"
+    },
+    "outOfReach": "This farm can't deliver to you fresh: it is outside its delivery area or yours.",
+    "batchProgress": "Shared trip progress",
+    "batchOpen": "{{pct}}% of the way to a paid-for trip · {{kg}} so far · ships by {{when}}",
+    "batchShipped": "Trip is on its way to the farmer.",
+    "batchBelow": "Sent to the farmer at the cut-off, below break-even. They decide whether to make the trip."
+  },
+  "rate": {
+    "title": "Suggested price",
+    "noPrices": "No mandi or shop price is known for this item yet, so no price can be suggested.",
+    "basis": "Mandi {{mandi}} · shop {{shop}} ({{source}}, {{area}})",
+    "source": {
+      "agmarknet": "Agmarknet, live",
+      "manual": "entered by admin",
+      "sample": "sample price"
+    },
+    "sampleWarning": "Sample prices, not live market data. The suggestion becomes real once the mandi price feed runs.",
+    "load": "Typical delivery load",
+    "distance": "Typical buyer distance",
+    "use": "Use {{price}}",
+    "how": "How this is worked out (per base unit)",
+    "nudgeOff": "off until enough buyer requests",
+    "noRoom": "One trip of {{load}} {{unit}} can't pay for itself at any price. The smallest worthwhile load is {{breakEven}} {{unit}}; household orders are pooled until they reach it.",
+    "step": {
+      "lowest": "Lowest fair price (mandi)",
+      "deliveryPerUnit": "Delivery cost per unit",
+      "highest": "Highest fair price (shop − delivery)",
+      "room": "Room to share",
+      "start": "Starting price (your share)",
+      "nudge": "Demand nudge",
+      "ageing": "After ageing cut",
+      "bigLot": "After big-lot cut",
+      "final": "Suggested price"
+    }
   }
 }

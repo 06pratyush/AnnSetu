@@ -20,6 +20,10 @@ import { BrandMark, CATEGORY_ICONS } from "@/components/domain/brand";
 import { CartLine, CartSummary } from "@/components/domain/cart";
 import { LanguageToggle, RoleChoiceCards, ThemeToggle, type AccountChoice } from "@/components/domain/choices";
 import { DemandCard, SuggestionPanel } from "@/components/domain/demand";
+import { BatchProgress, HiddenNote, MatchCard } from "@/components/domain/matching";
+import { ItemPicker } from "@/components/domain/item-picker";
+import { useCatalogue, useEngineSettings } from "@/lib/matching/hooks";
+import type { CatalogueItem } from "@/lib/matching/search";
 import { EmptyState } from "@/components/domain/empty-state";
 import { PriceTag, QuantityStepper, StatCard } from "@/components/domain/figures";
 import { CategoryChips, FarmerCard, RatingStars, SearchFilterBar, type MarketSort } from "@/components/domain/market";
@@ -27,7 +31,7 @@ import { OrderCard, OrderStatusBadge, OrderTimeline } from "@/components/domain/
 import { LedgerEntry, ProduceCard, ProduceRow } from "@/components/domain/produce";
 import { StockBar } from "@/components/domain/stock-bar";
 import type { CategorySlug, OrderStatus } from "@/lib/types";
-import { sampleCart, sampleDemand, sampleFarmer, sampleLedger, sampleListing, sampleOrder, sampleOrderInTransit, sampleProduce, sampleProduce2 } from "@/components/design-system/samples";
+import { sampleBatch, sampleCart, sampleFarmer, sampleFarmerDemand, sampleLedger, sampleListing, sampleMatch, sampleOrder, sampleOrderInTransit, sampleProduce, sampleProduce2 } from "@/components/design-system/samples";
 
 const SECTIONS = [
   ["principles", "Principles"],
@@ -39,6 +43,7 @@ const SECTIONS = [
   ["stock", "Stock & figures"],
   ["market", "Market"],
   ["orders", "Orders"],
+  ["matching", "Matching"],
   ["demand", "Demand"],
   ["layout", "Identity & layout"],
 ] as const;
@@ -105,6 +110,9 @@ export default function DesignSystemPage() {
   const [choice, setChoice] = useState<AccountChoice | null>("farmer");
   const [dialog, setDialog] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const { index } = useCatalogue();
+  const engine = useEngineSettings();
+  const [pickedItem, setPickedItem] = useState<CatalogueItem | null>(null);
   const statuses: OrderStatus[] = ["placed", "accepted", "packed", "out_for_delivery", "delivered", "rejected", "cancelled"];
   // Specimens show times relative to "now" and in the viewer's time zone, so they render after hydration.
   const hydrated = useHydrated();
@@ -443,12 +451,38 @@ export default function DesignSystemPage() {
             </Specimen>
           </Section>
 
-          <Section id="demand" title="Demand" intro="The suggestion panel shows whatever the recommendation hook returns; by default, open buyer requests.">
+          <Section id="matching" title="Matching" intro="The five algorithms, made visible: search turns any spelling into a catalogue item, hard rules hide what can't serve the buyer, the score orders the rest, stock is live, and household orders share one trip.">
+            <Specimen name="Item picker" note="Step 1. Type tamatr, tomatoe or टमाटर. Near matches are offered, never applied silently.">
+              <div className="max-w-md">
+                <ItemPicker index={index} value={pickedItem} onChange={setPickedItem} placeholder={t("produce.namePlaceholder")} />
+              </div>
+            </Specimen>
+            <Specimen name="Match card" note="Steps 2-4: a listing that passed every hard rule, with distance, freshness on arrival, trust and the trip cost. Why first? opens the score.">
+              <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+                <MatchCard row={sampleMatch} href="#" name="Tomato" quantity={60} pooled={false} weights={engine.wBusiness} />
+                <MatchCard row={{ ...sampleMatch, id: "m2", orders_completed: 0, orders_on_time: 0, part_trust: 0.8, distance_km: 6, trip_cost: 156, farmer_name: "Sunita Devi", farmer_verified: false }} href="#" name="Tomato" quantity={null} pooled weights={engine.wHousehold} />
+              </div>
+            </Specimen>
+            <Specimen name="Hidden note" note="What the hard rules removed, so an empty or short list explains itself.">
+              <HiddenNote hidden={[{ reason: "too_far", listings: 2 }, { reason: "not_fresh_on_arrival", listings: 1 }]} />
+            </Specimen>
+            <Specimen name="Batch progress" note="Household orders pool into one trip; the bar is the households' savings against the trip cost.">
+              <div className="flex max-w-md flex-col gap-6">
+                <BatchProgress batch={sampleBatch} />
+                <BatchProgress batch={{ ...sampleBatch, status: "released", room: 543.6 }} />
+              </div>
+            </Specimen>
+          </Section>
+
+          <Section id="demand" title="Demand" intro="Open buyer requests mapped to this farm: the ones it can reach and already has stock for come first.">
             <Specimen name="Demand card">
-              <DemandCard demand={sampleDemand} listHref="#" />
+              <div className="flex flex-col gap-3">
+                <DemandCard demand={sampleFarmerDemand[0]} listHref="#" />
+                <DemandCard demand={sampleFarmerDemand[1]} listHref="#" />
+              </div>
             </Specimen>
             <Specimen name="Suggestion panel">
-              <SuggestionPanel suggestions={[{ id: "s1", kind: "demand", demand: sampleDemand }, { id: "s2", kind: "demand", demand: { ...sampleDemand, id: "d2", item_name: "Green chilli", quantity: 40, buyer_type: "individual", buyer_label: "Sam", target_price: null, notes: null } }]} listHref={() => "#"} />
+              <SuggestionPanel demand={sampleFarmerDemand} listHref={() => "#"} />
             </Specimen>
           </Section>
 

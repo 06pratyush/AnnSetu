@@ -1,0 +1,9 @@
+<!-- @dsCard group="Matching" height=90 -->
+<div id="root" class="bg-bg p-4 text-ink"></div>
+<script>
+const A = window.AnnSetu; const h = React.createElement; const S = A.samples;
+function Demo() {
+  return h(A.HiddenNote, { hidden: [{ reason: "too_far", listings: 2 }, { reason: "not_fresh_on_arrival", listings: 1 }, { reason: "below_min_order", listings: 1 }] });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+</script>

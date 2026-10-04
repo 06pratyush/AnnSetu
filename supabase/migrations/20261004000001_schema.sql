@@ -6,7 +6,8 @@ create type public.consumer_type as enum ('individual', 'industrial');
 create type public.unit as enum ('kg', 'quintal', 'tonne', 'dozen', 'piece', 'litre', 'bunch');
 create type public.produce_category as enum ('vegetables', 'fruits', 'grains', 'pulses', 'spices', 'dairy', 'oilseeds', 'others');
 create type public.produce_status as enum ('active', 'paused', 'sold_out', 'archived');
-create type public.order_status as enum ('placed', 'accepted', 'rejected', 'packed', 'out_for_delivery', 'delivered', 'cancelled');
+-- 'pooling': a household order waiting in a delivery batch until the trip pays for itself.
+create type public.order_status as enum ('pooling', 'placed', 'accepted', 'rejected', 'packed', 'out_for_delivery', 'delivered', 'cancelled');
 create type public.ledger_type as enum ('listed', 'restocked', 'reserved', 'released', 'sold', 'spoiled', 'adjusted');
 create type public.demand_status as enum ('open', 'fulfilled', 'closed');
 create type public.business_type as enum ('restaurant', 'retailer', 'wholesaler', 'processor', 'institution', 'other');

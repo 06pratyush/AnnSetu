@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChipInput } from "@/components/ui/chip-input";
 import { Field, FieldSet } from "@/components/ui/field";
-import { Input, NativeSelect } from "@/components/ui/input";
+import { Input, NativeSelect, UnitInput } from "@/components/ui/input";
+import { useEngineSettings } from "@/lib/matching/hooks";
 import { Alert, Separator } from "@/components/ui/misc";
 import { EMPTY_ADDRESS, LocationPicker, validateAddress, type AddressErrors } from "@/components/map/location-picker";
 
@@ -44,6 +45,10 @@ export function ProfileForm({
   const [farmName, setFarmName] = useState(profile.farmer_details?.farm_name ?? "");
   const [farmSize, setFarmSize] = useState(profile.farmer_details?.farm_size_acres?.toString() ?? "");
   const [crops, setCrops] = useState<string[]>(profile.farmer_details?.main_crops ?? []);
+  const settings = useEngineSettings();
+  const [radius, setRadius] = useState(profile.farmer_details?.delivery_radius_km?.toString() ?? "");
+  const [maxKm, setMaxKm] = useState(profile.buyer_details?.max_distance_km?.toString() ?? "");
+  const defaultMax = isIndustrial ? settings.businessMaxKm : settings.householdMaxKm;
   const [businessName, setBusinessName] = useState(profile.buyer_details?.business_name ?? "");
   const [businessType, setBusinessType] = useState<BusinessType | "">(profile.buyer_details?.business_type ?? "");
   const [gstin, setGstin] = useState(profile.buyer_details?.gstin ?? "");
@@ -67,6 +72,9 @@ export function ProfileForm({
     if (isIndustrial && !businessName.trim()) next.businessName = t("errors.required");
     if (isIndustrial && gstin.trim() && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin.trim().toUpperCase())) next.gstin = t("errors.gstin");
     const ae = validateAddress(addr, t);
+    if (addr.lat === null || addr.lng === null) ae.line1 = t("onboarding.pinRequired");
+    if (radius && !(Number(radius) > 0)) next.radius = t("errors.positive");
+    if (maxKm && !(Number(maxKm) > 0)) next.maxKm = t("errors.positive");
     setErrors(next);
     setAddrErrors(ae);
     setFormError(null);
@@ -82,12 +90,14 @@ export function ProfileForm({
           farm_name: farmName.trim() || null,
           farm_size_acres: farmSize ? Number(farmSize) : null,
           main_crops: crops,
+          delivery_radius_km: radius ? Number(radius) : null,
         });
       } else {
         await saveBuyerDetails(profile.id, {
           business_name: businessName.trim() || null,
           business_type: businessType || null,
           gstin: gstin.trim() ? gstin.trim().toUpperCase() : null,
+          max_distance_km: maxKm ? Number(maxKm) : null,
         });
       }
       await saveDefaultAddress(profile.id, addr);
@@ -130,6 +140,9 @@ export function ProfileForm({
             <Field id="crops" label={t("onboarding.mainCrops")} hint={t("onboarding.mainCropsHint")} className="sm:col-span-2">
               <ChipInput value={crops} onChange={setCrops} removeLabel={(c) => `${t("common.remove")}: ${c}`} />
             </Field>
+            <Field id="radius" label={t("onboarding.radius")} optional={t("common.optional")} hint={t("onboarding.radiusHint", { km: settings.farmerRadiusKm })} error={errors.radius}>
+              <UnitInput unit="km" value={radius} placeholder={String(settings.farmerRadiusKm)} onChange={(e) => setRadius(e.target.value)} min={0} step="any" />
+            </Field>
           </div>
         </FieldSet>
       ) : isIndustrial ? (
@@ -155,7 +168,15 @@ export function ProfileForm({
         </FieldSet>
       ) : null}
 
-      {isFarmer || isIndustrial ? <Separator /> : null}
+      {isFarmer ? null : (
+        <FieldSet legend={t("onboarding.reach")}>
+          <Field id="max-km" label={t("onboarding.maxKm")} optional={t("common.optional")} hint={t("onboarding.maxKmHint", { km: defaultMax })} error={errors.maxKm}>
+            <UnitInput unit="km" value={maxKm} placeholder={String(defaultMax)} onChange={(e) => setMaxKm(e.target.value)} min={0} step="any" />
+          </Field>
+        </FieldSet>
+      )}
+
+      <Separator />
 
       <FieldSet legend={t("onboarding.location")} description={isFarmer ? t("onboarding.locationFarmerHint") : t("onboarding.locationBuyerHint")}>
         <LocationPicker value={addr} onChange={setAddr} errors={addrErrors} />

@@ -26,6 +26,18 @@ export function errorMessage(err: unknown, t: TFunction): string {
         return t("errors.minOrderTooBig");
       case "upload_failed":
         return t("errors.upload");
+      case "out_of_range":
+      case "not_fresh_on_arrival":
+      case "hidden_in_area":
+        return t(`checkout.problem.${err.code}`, { name });
+      case "location_required":
+        return t("checkout.needPin");
+      case "unknown_item":
+      case "unit_not_allowed":
+      case "item_locked":
+      case "harvest_in_future":
+      case "deliver_by_in_past":
+        return t(`errors.${err.code}`);
     }
   }
   if (/invalid login credentials/i.test(msg)) return t("auth.invalidCredentials");

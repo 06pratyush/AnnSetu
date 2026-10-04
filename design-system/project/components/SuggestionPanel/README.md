@@ -1,12 +1,18 @@
 # SuggestionPanel
 
-SuggestionPanel is the farmer's "In demand" panel. It renders whatever the recommendation hook returns (`src/lib/recommend`); by default that is open buyer requests, newest first, with no ranking.
+SuggestionPanel is the farmer's "In demand" panel: open buyer requests mapped to this farm by the database (`demand_for_farmer`). Requests the farm can fill now come first, then others it can reach, nearest first; requests out of reach come last, so the farmer still sees what is wanted nearby.
 
-**Provide** `suggestions` and `listHref` for each. The `haldi` dot marks the panel as the place for demand across the app.
+**Provide** `demand` and `listHref` for each. The `haldi` dot marks the panel as the place for demand across the app.
 
 ## Props
 
 ```ts
-export interface Suggestion { id: string; kind: "demand"; demand?: OpenDemand; score?: number; reason?: string }
-export interface SuggestionPanelProps { suggestions: Suggestion[]; listHref(s: Suggestion): string | undefined; seeAllHref?: string; limit?: number; loading?: boolean }
+export interface SuggestionPanelProps {
+  demand: DemandCardProps["demand"][];
+  listHref(d: DemandCardProps["demand"]): string | undefined;
+  nameOf?(d: DemandCardProps["demand"]): string;
+  seeAllHref?: string;
+  limit?: number;
+  loading?: boolean;
+}
 ```

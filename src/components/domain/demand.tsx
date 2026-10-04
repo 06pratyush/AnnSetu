@@ -1,34 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CalendarDays, Inbox, MapPin, PackagePlus, TrendingUp, User } from "lucide-react";
+import { Building2, CalendarDays, CircleCheck, Inbox, MapPin, PackagePlus, Route, TrendingUp, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useFormat } from "@/lib/i18n/format";
-import type { OpenDemand } from "@/lib/types";
-import type { Suggestion } from "@/lib/recommend";
+import type { ConsumerType, CategorySlug, FarmerDemand, OpenDemand, Unit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CategoryIcon } from "./brand";
 import { EmptyState } from "./empty-state";
 
-/** A buyer's open request as a farmer sees it, with a shortcut to list matching produce. */
+/** What a demand card needs: an open request, plus (for a farmer) how it maps to their farm. */
+export type DemandLike = {
+  id: string;
+  item_name: string;
+  category: CategorySlug;
+  quantity: number;
+  unit: Unit;
+  target_price: number | null;
+  needed_by: string | null;
+  notes: string | null;
+  district: string | null;
+  state: string | null;
+  buyer_type: ConsumerType | null;
+  buyer_label: string;
+} & Partial<Pick<FarmerDemand, "distance_km" | "can_reach" | "ready" | "listing_available" | "listing_unit">>;
+
+/** A buyer's open request as a farmer sees it: can this farm reach it, and is stock ready for it. */
 export function DemandCard({
   demand,
   listHref,
-  reason,
+  name,
   compact,
   className,
 }: {
-  demand: OpenDemand;
+  demand: DemandLike | OpenDemand;
   listHref?: string;
-  /** Optional one-line explanation from the recommendation logic. */
-  reason?: string;
+  /** Item name in the UI language, when the request points at a catalogue item. */
+  name?: string;
   compact?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
   const f = useFormat();
+  const d = demand as DemandLike;
   const place = [demand.district, demand.state].filter(Boolean).join(", ");
   const BuyerIcon = demand.buyer_type === "industrial" ? Building2 : User;
   return (
@@ -38,7 +54,7 @@ export function DemandCard({
           <CategoryIcon category={demand.category} className="size-5 text-haldi-ink" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h3 className="font-display text-h3 font-semibold text-ink">{demand.item_name}</h3>
+          <h3 className="font-display text-h3 font-semibold text-ink">{name || demand.item_name}</h3>
           <p className="text-body font-semibold text-ink tabular-nums">
             {t("suggestions.needed", { qty: f.number(demand.quantity), unit: f.unit(demand.unit) })}
           </p>
@@ -71,9 +87,28 @@ export function DemandCard({
       </ul>
 
       {!compact && demand.notes ? <p className="text-small text-ink">“{demand.notes}”</p> : null}
-      {reason ? <p className="text-small text-haldi-ink">{reason}</p> : null}
+      {d.distance_km !== undefined ? (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small">
+          {d.distance_km !== null ? (
+            <span className="flex items-center gap-1 text-ink">
+              <Route className="size-4 text-ink-muted" aria-hidden />
+              {t("matching.kmAway", { km: f.number(d.distance_km, 0) })}
+            </span>
+          ) : null}
+          {d.ready ? (
+            <span className="flex items-center gap-1 font-semibold text-success">
+              <CircleCheck className="size-4" aria-hidden />
+              {t("suggestions.ready", { qty: f.qty(d.listing_available ?? 0, d.listing_unit ?? demand.unit) })}
+            </span>
+          ) : d.can_reach ? (
+            <span className="text-ink-muted">{t("suggestions.canReach")}</span>
+          ) : (
+            <span className="text-ink-muted">{t("suggestions.outOfReach")}</span>
+          )}
+        </p>
+      ) : null}
 
-      {listHref ? (
+      {listHref && !d.ready ? (
         <Button asChild variant="outline" size={compact ? "sm" : "md"} className="self-start">
           <Link href={listHref}>
             <PackagePlus aria-hidden />
@@ -86,26 +121,28 @@ export function DemandCard({
 }
 
 /**
- * The farmer's suggestion panel. It renders whatever the recommendation hook returns
- * (src/lib/recommend); by default that is open buyer requests, newest first.
+ * The farmer's "In demand" panel: open buyer requests mapped to this farm (public.demand_for_farmer),
+ * the ones it can reach and already has stock for first.
  */
 export function SuggestionPanel({
-  suggestions,
+  demand,
   listHref,
+  nameOf,
   seeAllHref,
   limit = 3,
   loading,
   className,
 }: {
-  suggestions: Suggestion[];
-  listHref: (s: Suggestion) => string | undefined;
+  demand: DemandLike[];
+  listHref: (d: DemandLike) => string | undefined;
+  nameOf?: (d: DemandLike) => string;
   seeAllHref?: string;
   limit?: number;
   loading?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const shown = suggestions.slice(0, limit);
+  const shown = demand.slice(0, limit);
   return (
     <section aria-labelledby="suggestion-panel-title" className={cn("flex min-w-0 flex-col gap-4 rounded-md border border-border bg-surface p-4 sm:p-6", className)}>
       <header className="flex items-start justify-between gap-3">
@@ -116,7 +153,7 @@ export function SuggestionPanel({
           </h2>
           <p className="text-small text-ink-muted">{t("suggestions.panelSubtitle")}</p>
         </div>
-        {seeAllHref && suggestions.length > limit ? (
+        {seeAllHref && demand.length > limit ? (
           <Button asChild variant="link" size="sm">
             <Link href={seeAllHref}>{t("common.seeAll")}</Link>
           </Button>
@@ -132,9 +169,9 @@ export function SuggestionPanel({
         <EmptyState icon={Inbox} title={t("suggestions.empty")} body={t("suggestions.emptyBody")} />
       ) : (
         <div className="flex flex-col gap-3">
-          {shown.map((s) =>
-            s.demand ? <DemandCard key={s.id} demand={s.demand} reason={s.reason} listHref={listHref(s)} compact /> : null,
-          )}
+          {shown.map((d) => (
+            <DemandCard key={d.id} demand={d} name={nameOf?.(d)} listHref={listHref(d)} compact />
+          ))}
         </div>
       )}
     </section>
@@ -142,7 +179,7 @@ export function SuggestionPanel({
 }
 
 /** Totals of open requests per item: descriptive only, no ranking logic. */
-export function TopRequested({ demand, className }: { demand: OpenDemand[]; className?: string }) {
+export function TopRequested({ demand, className }: { demand: DemandLike[]; className?: string }) {
   const { t } = useTranslation();
   const f = useFormat();
   const groups = new Map<string, { name: string; unit: string; qty: number; count: number }>();

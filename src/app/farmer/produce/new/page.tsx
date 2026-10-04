@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { PageSkeleton } from "@/lib/auth/role-guard";
 import { createProduce } from "@/lib/api";
-import { keys, useOpenDemand } from "@/lib/queries";
+import { keys, useFarmerDemand } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert } from "@/components/ui/misc";
 import { toast } from "@/components/ui/toaster";
@@ -21,7 +21,7 @@ function NewProduce() {
   const params = useSearchParams();
   const { profile } = useAuth();
   const demandId = params.get("demand");
-  const demand = useOpenDemand();
+  const demand = useFarmerDemand();
   const fromDemand = demandId ? demand.data?.find((d) => d.id === demandId) : undefined;
   if (demandId && demand.isLoading) return <PageSkeleton />;
 
@@ -36,7 +36,7 @@ function NewProduce() {
       <Card>
         <CardContent className="pt-4 sm:pt-6">
           <ProduceForm
-            draft={fromDemand ? { name: fromDemand.item_name, category: fromDemand.category, unit: fromDemand.unit } : undefined}
+            draft={fromDemand ? { itemId: fromDemand.item_id, unit: fromDemand.unit } : undefined}
             submitLabel={t("produce.create")}
             onSubmit={async (input) => {
               await createProduce(input);

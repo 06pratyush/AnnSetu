@@ -27,19 +27,25 @@ jobs:
 
       - run: npm ci
 
-      - name: Checks (translations, contrast, database rules)
-        run: npm run check:i18n && npm run check:contrast && npm run test:db
+      - name: Checks (translations, contrast, database rules, matching engine)
+        run: npm run check:i18n && npm run check:contrast && npm run test:db && npm test
 
       - id: pages
         uses: actions/configure-pages@v6
 
       - name: Build static site
-        run: npm run build
+        # The URL and anon/publishable key are public by design (they ship inside the site), so a
+        # repository variable is enough; a secret of the same name works too.
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::No Supabase URL/key set: the site will say it isn't connected to its database. See README, step 1."
+          fi
+          npm run build
         env:
           # /<repo-name> for a project site; empty for <user>.github.io
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

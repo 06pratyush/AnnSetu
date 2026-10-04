@@ -9,7 +9,7 @@ export type CategorySlug = "vegetables" | "fruits" | "grains" | "pulses" | "spic
 export const CATEGORY_SLUGS: CategorySlug[] = ["vegetables", "fruits", "grains", "pulses", "spices", "dairy", "oilseeds", "others"];
 
 export type ProduceStatus = "active" | "paused" | "sold_out" | "archived";
-export type OrderStatus = "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
+export type OrderStatus = "pooling" | "placed" | "accepted" | "rejected" | "packed" | "out_for_delivery" | "delivered" | "cancelled";
 export type LedgerType = "listed" | "restocked" | "reserved" | "released" | "sold" | "spoiled" | "adjusted";
 export type DemandStatus = "open" | "fulfilled" | "closed";
 export type BusinessType = "restaurant" | "retailer" | "wholesaler" | "processor" | "institution" | "other";
@@ -31,6 +31,10 @@ export interface FarmerDetails {
   farm_name: string | null;
   farm_size_acres: number | null;
   main_crops: string[];
+  verified?: boolean;
+  delivery_radius_km?: number | null;
+  orders_completed?: number;
+  orders_on_time?: number;
 }
 
 export interface BuyerDetails {
@@ -38,6 +42,7 @@ export interface BuyerDetails {
   business_name: string | null;
   business_type: BusinessType | null;
   gstin: string | null;
+  max_distance_km?: number | null;
 }
 
 export interface Address {
@@ -60,6 +65,9 @@ export type AddressInput = Omit<Address, "id" | "user_id" | "is_default">;
 export interface Produce {
   id: string;
   farmer_id: string;
+  item_id: string;
+  harvested_at: string;
+  delivery_radius_km: number | null;
   category: CategorySlug;
   name: string;
   variety: string | null;
@@ -111,7 +119,57 @@ export interface MarketListing {
   farmer_avatar: string | null;
   farmer_rating: number | null;
   farmer_ratings_count: number;
+  item_id: string;
+  harvested_at: string;
+  farmer_verified: boolean | null;
+  orders_completed: number | null;
+  orders_on_time: number | null;
 }
+
+/** One row of public.match_listings: a listing that passed the hard rules, with its score. */
+export interface MatchRow {
+  id: string;
+  farmer_id: string;
+  item_id: string;
+  category: CategorySlug;
+  name: string;
+  variety: string | null;
+  description: string | null;
+  unit: Unit;
+  price_per_unit: number;
+  qty_available: number;
+  min_order_qty: number;
+  harvested_at: string;
+  is_organic: boolean;
+  images: string[];
+  district: string | null;
+  state: string | null;
+  created_at: string;
+  farmer_name: string;
+  farm_name: string | null;
+  farmer_avatar: string | null;
+  farmer_verified: boolean | null;
+  farmer_rating: number | null;
+  farmer_ratings_count: number;
+  orders_completed: number;
+  orders_on_time: number;
+  distance_km: number | null;
+  travel_hours: number;
+  hours_used: number;
+  shelf_life_hours: number;
+  price_base: number;
+  shop_price: number | null;
+  trip_cost: number | null;
+  part_price: number;
+  part_fresh: number;
+  part_near: number;
+  part_trust: number;
+  part_fill: number;
+  score: number;
+  total_count: number;
+}
+
+export type HiddenReason = "unverified" | "no_location" | "too_far" | "below_min_order" | "not_enough_stock" | "not_fresh_on_arrival" | "hidden_in_area";
 
 export interface FarmerPublic {
   id: string;
@@ -125,6 +183,9 @@ export interface FarmerPublic {
   avg_rating: number | null;
   ratings_count: number;
   member_since: string;
+  verified: boolean | null;
+  orders_completed: number | null;
+  orders_on_time: number | null;
 }
 
 export interface LedgerEntry {
@@ -140,7 +201,7 @@ export interface LedgerEntry {
 export interface StatusEvent {
   status: OrderStatus;
   at: string;
-  by: "farmer" | "buyer";
+  by: "farmer" | "buyer" | "system";
 }
 
 export interface OrderItem {
@@ -179,13 +240,52 @@ export interface Order {
   status_history: StatusEvent[];
   created_at: string;
   updated_at: string;
+  batch_id: string | null;
+  delivery_fee: number;
+  distance_km: number | null;
+  deliver_by: string | null;
   order_items?: OrderItem[];
   review?: Review | null;
+  batch?: DeliveryBatch | null;
+}
+
+/** Household orders for one farm and PIN code, pooled into one trip. */
+export interface DeliveryBatch {
+  id: string;
+  farmer_id: string;
+  pincode: string;
+  distance_km: number | null;
+  trip_cost: number;
+  status: "open" | "released" | "cancelled";
+  load_qty: number;
+  room: number;
+  below_break_even: boolean;
+  opened_at: string;
+  cutoff_at: string;
+  released_at: string | null;
+}
+
+/** public.quote_delivery: the delivery fee per farmer before an order is placed. */
+export interface DeliveryQuote {
+  farmer_id: string;
+  distance_km: number | null;
+  trip_cost: number | null;
+  pooled: boolean;
+  batch_load: number;
+  batch_room: number;
+  my_load: number;
+  my_room: number;
+  fee_now: number | null;
+  ships_now: boolean;
+  cutoff_at: string | null;
+  problem: HiddenReason | null;
+  problem_item: string | null;
 }
 
 export interface DemandRequest {
   id: string;
   buyer_id: string;
+  item_id: string | null;
   category: CategorySlug;
   item_name: string;
   quantity: number;
@@ -207,6 +307,30 @@ export interface OpenDemand extends DemandRequest {
   approx_lng: number | null;
 }
 
+/** public.demand_for_farmer: an open request as one farmer sees it. */
+export interface FarmerDemand {
+  id: string;
+  item_id: string | null;
+  category: CategorySlug;
+  item_name: string;
+  quantity: number;
+  unit: Unit;
+  target_price: number | null;
+  needed_by: string | null;
+  notes: string | null;
+  district: string | null;
+  state: string | null;
+  created_at: string;
+  buyer_type: ConsumerType | null;
+  buyer_label: string;
+  distance_km: number | null;
+  can_reach: boolean;
+  listing_id: string | null;
+  listing_available: number | null;
+  listing_unit: Unit | null;
+  ready: boolean;
+}
+
 export interface Review {
   id: string;
   order_id: string;
@@ -219,6 +343,7 @@ export interface Review {
 
 export interface CartLine {
   produceId: string;
+  itemId?: string;
   category: CategorySlug;
   farmerId: string;
   farmerName: string;

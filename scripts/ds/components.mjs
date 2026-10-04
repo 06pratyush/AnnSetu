@@ -434,28 +434,123 @@ New orders get a \`haldi\` outline. The farmer's next step is the primary button
     preview: mount(`  return h(A.RoleScope, { role: "farmer" }, h("div", { className: "max-w-md" }, h(A.OrderCard, { order: S.sampleOrder, perspective: "farmer", onAction: function () {} })));`),
   },
 
+  // ------------------------------------------------------------------ Matching
+  {
+    name: "ItemPicker",
+    group: "Matching",
+    height: 400,
+    readme: `ItemPicker is step 1 of the matching engine as a control: whatever the person types (English, Hindi in Latin letters or Devanagari, with typos) becomes one catalogue item.
+
+**How it matches**: each name is scored by the better of trigram overlap and edit closeness (a swapped pair of letters counts as one typo); names scoring 0.55 or more are offered. An exact spelling ("tamatar", "टमाटर") is listed first; anything else appears under **Did you mean**, and is never applied silently.
+
+**Provide** the catalogue \`index\` (\`indexCatalogue(items)\`), the chosen \`value\` and \`onChange\`. Inside a Field it takes the label, hint and error wiring like any input. Keyboard: arrows to move, Enter to choose, Escape to close.
+
+**Don't** let free text through: listings and requests always carry an \`item_id\`, which is what lets search, matching and demand line up.`,
+    dts: `export interface CatalogueItem { id: string; category: string; nameEn: string; nameHi: string; baseUnit: "kg" | "litre" | "piece" | "dozen"; shelfLifeHours: number; names: string[] }
+export interface ItemPickerProps {
+  index: unknown; // indexCatalogue(SEED_CATALOGUE)
+  value: CatalogueItem | null;
+  onChange(item: CatalogueItem | null): void;
+  id?: string;
+  /** Lowest closeness offered, 0-1. Default 0.55. */
+  cutoff?: number;
+  placeholder?: string;
+}`,
+    preview: mount(`  const index = React.useMemo(function () { return A.indexCatalogue(A.SEED_CATALOGUE); }, []);
+  const st = React.useState(null);
+  return h(A.RoleScope, { role: "farmer" }, h("div", { className: "flex max-w-md flex-col gap-2 pb-72" },
+    h("p", { className: "text-small text-ink-muted" }, "Try tamatr, pyaz, bhindi or टमाटर"),
+    h(A.ItemPicker, { index: index, value: st[0], onChange: st[1], placeholder: "e.g. Tomato" })));`),
+  },
+  {
+    name: "MatchCard",
+    group: "Matching",
+    height: 620,
+    readme: `MatchCard is one listing that passed every hard rule (step 2) for this buyer, in the order the score put it (step 3).
+
+It adds what the buyer needs to choose: price per unit and, when the quantity is known, the price **with delivery**; quantity available; when it was picked and how much shelf life is left on arrival; the farm's on-time record ("New farmer" before the first delivery); distance; and the trip cost (shared by households, one trip for a business).
+
+**Why this order?** opens the five part-scores (price against the local shop, freshness on arrival, nearness, on-time record, how much of the order it fills) with the weights for this buyer type. Nothing about the buyer as a person goes into the score.`,
+    dts: `export interface MatchCardProps {
+  row: MarketListing & { distance_km: number | null; travel_hours: number | null; hours_used: number; shelf_life_hours: number; price_base: number;
+    shop_price: number | null; trip_cost: number | null; part_price: number; part_fresh: number; part_near: number; part_trust: number; part_fill: number; score: number;
+    farmer_verified: boolean; orders_completed: number; orders_on_time: number; harvested_at: string };
+  href: string;
+  /** Item name in the UI language. */
+  name: string;
+  /** The buyer's wanted quantity in the listing's unit, when known. */
+  quantity: number | null;
+  /** Households share delivery; businesses pay one trip. */
+  pooled: boolean;
+  weights: { price: number; fresh: number; near: number; trust: number; fill: number };
+}`,
+    preview: mount(`  const W = A.DEFAULT_SETTINGS;
+  return h(A.RoleScope, { role: "buyer" }, h("div", { className: "grid max-w-2xl gap-4 sm:grid-cols-2" },
+    h(A.MatchCard, { row: S.sampleMatch, href: "#", name: "Tomato", quantity: 60, pooled: false, weights: W.wBusiness }),
+    h(A.MatchCard, { row: Object.assign({}, S.sampleMatch, { id: "m2", orders_completed: 0, orders_on_time: 0, part_trust: 0.8, distance_km: 6, trip_cost: 156, farmer_name: "Sunita Devi", farmer_verified: false }), href: "#", name: "Tomato", quantity: null, pooled: true, weights: W.wHousehold })));`),
+  },
+  {
+    name: "HiddenNote",
+    group: "Matching",
+    height: 90,
+    readme: `HiddenNote says what the hard rules removed and why ("2 too far, 1 wouldn't arrive fresh"), so a short or empty list explains itself instead of looking broken. Counts come from \`match_hidden\`, which reports the first rule each hidden listing breaks.`,
+    dts: `export type HiddenReason = "unverified" | "no_location" | "too_far" | "below_min_order" | "not_enough_stock" | "not_fresh_on_arrival" | "hidden_in_area";
+export interface HiddenNoteProps { hidden: { reason: HiddenReason; listings: number }[] }`,
+    preview: mount(`  return h(A.HiddenNote, { hidden: [{ reason: "too_far", listings: 2 }, { reason: "not_fresh_on_arrival", listings: 1 }, { reason: "below_min_order", listings: 1 }] });`),
+  },
+  {
+    name: "BatchProgress",
+    group: "Matching",
+    height: 230,
+    readme: `BatchProgress shows a shared household trip filling up. Household orders to one farm and one PIN code wait in a batch; the bar is the households' combined saving against the shop price, measured against the trip cost.
+
+The trip goes to the farmer when the savings cover it (every household then pays less than the shop, delivery included) or at the cut-off, 24 hours after the first order. A trip sent at the cut-off is marked below break-even and the farmer decides whether to make it.`,
+    dts: `export interface BatchProgressProps {
+  batch: { room: number; trip_cost: number; load_qty: number; cutoff_at: string; status: "open" | "released" | "accepted" | "rejected" | "delivered" | "cancelled"; below_break_even: boolean };
+}`,
+    preview: mount(`  return h(A.RoleScope, { role: "buyer" }, h("div", { className: "flex max-w-md flex-col gap-6" },
+    h(A.BatchProgress, { batch: S.sampleBatch }),
+    h(A.BatchProgress, { batch: Object.assign({}, S.sampleBatch, { status: "released", room: 543.6 }) }),
+    h(A.BatchProgress, { batch: Object.assign({}, S.sampleBatch, { status: "released", room: 240, below_break_even: true }) })));`),
+  },
+
   // ------------------------------------------------------------------ Demand
   {
     name: "DemandCard",
     group: "Demand",
-    height: 280,
-    readme: `DemandCard shows a buyer's open requirement to farmers: item, quantity needed, needed-by date, target price, buyer type and place, with a "List this" shortcut that opens a prefilled listing form.
+    height: 460,
+    readme: `DemandCard shows a buyer's open requirement to a farmer: item, quantity, needed-by date, target price, buyer type and place, with a "List this" shortcut that opens a prefilled listing form.
 
-The buyer is labelled by first name or business name only. A one-line \`reason\` slot shows text from the recommendation logic when it provides one.`,
-    dts: `export interface DemandCardProps { demand: OpenDemand; listHref?: string; reason?: string; compact?: boolean }`,
-    preview: mount(`  return h(A.RoleScope, { role: "farmer" }, h(A.DemandCard, { demand: S.sampleDemand, listHref: "#" }));`),
+Mapped to the farm, it also says how far the buyer is and whether the farm can reach them (inside both the farm's delivery radius and the buyer's distance), and **You can fill this now** when an active listing has enough stock that would still arrive fresh. The buyer is labelled by first name or business name only.`,
+    dts: `export interface DemandCardProps {
+  demand: OpenDemand & { distance_km?: number | null; can_reach?: boolean; ready?: boolean; listing_available?: number | null; listing_unit?: Unit | null };
+  listHref?: string;
+  /** Item name in the UI language. */
+  name?: string;
+  compact?: boolean;
+}`,
+    preview: mount(`  return h(A.RoleScope, { role: "farmer" }, h("div", { className: "flex max-w-xl flex-col gap-3" },
+    h(A.DemandCard, { demand: S.sampleFarmerDemand[0], listHref: "#" }),
+    h(A.DemandCard, { demand: S.sampleFarmerDemand[2], listHref: "#" })));`),
   },
   {
     name: "SuggestionPanel",
     group: "Demand",
-    height: 510,
-    readme: `SuggestionPanel is the farmer's "In demand" panel. It renders whatever the recommendation hook returns (\`src/lib/recommend\`); by default that is open buyer requests, newest first, with no ranking.
+    height: 750,
+    readme: `SuggestionPanel is the farmer's "In demand" panel: open buyer requests mapped to this farm by the database (\`demand_for_farmer\`). Requests the farm can fill now come first, then others it can reach, nearest first; requests out of reach come last, so the farmer still sees what is wanted nearby.
 
-**Provide** \`suggestions\` and \`listHref\` for each. The \`haldi\` dot marks the panel as the place for demand across the app.`,
-    dts: `export interface Suggestion { id: string; kind: "demand"; demand?: OpenDemand; score?: number; reason?: string }
-export interface SuggestionPanelProps { suggestions: Suggestion[]; listHref(s: Suggestion): string | undefined; seeAllHref?: string; limit?: number; loading?: boolean }`,
-    preview: mount(`  return h(A.RoleScope, { role: "farmer" }, h(A.SuggestionPanel, { suggestions: [{ id: "a", kind: "demand", demand: S.sampleDemand }, { id: "b", kind: "demand", demand: Object.assign({}, S.sampleDemand, { id: "d2", item_name: "Green chilli", quantity: 40, buyer_type: "individual", buyer_label: "Sam", target_price: null }) }], listHref: function () { return "#"; } }));`),
+**Provide** \`demand\` and \`listHref\` for each. The \`haldi\` dot marks the panel as the place for demand across the app.`,
+    dts: `export interface SuggestionPanelProps {
+  demand: DemandCardProps["demand"][];
+  listHref(d: DemandCardProps["demand"]): string | undefined;
+  nameOf?(d: DemandCardProps["demand"]): string;
+  seeAllHref?: string;
+  limit?: number;
+  loading?: boolean;
+}`,
+    preview: mount(`  return h(A.RoleScope, { role: "farmer" }, h(A.SuggestionPanel, { demand: S.sampleFarmerDemand, listHref: function () { return "#"; } }));`),
   },
+
 
   // ------------------------------------------------------------------ Identity
   {

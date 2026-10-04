@@ -95,12 +95,13 @@ await as(FARMER, async () => {
 });
 await as(FARMER2, async () => {
   await q(`update public.profiles set phone = '9811111111', onboarded = true where id = auth.uid()`);
-  await q(addr(30.9, 75.85, "Ludhiana"));
+  await q(addr(19.11, 73.97, "Pune"));
 });
+// Buyers live in Narayangaon, about 15 km from the farm: inside every delivery limit.
 for (const b of [BUYER, BUYER2]) {
   await as(b, async () => {
     await q(`update public.profiles set phone = '9000000000', onboarded = true where id = auth.uid()`);
-    await q(addr(18.52, 73.85, "Pune"));
+    await q(addr(19.115, 73.975, "Pune"));
   });
 }
 await expectError("a user cannot change their own role", () => as(BUYER, () => q(`update public.profiles set role = 'farmer' where id = auth.uid()`)), "permission denied");
@@ -108,14 +109,14 @@ check("a user cannot read someone else's profile", (await as(BUYER, () => q(`sel
 
 console.log("\nlisting produce");
 const tomato = await as(FARMER, async () =>
-  (await q(`insert into public.produce (category, name, unit, price_per_unit, qty_listed, min_order_qty) values ('vegetables','Tomato','kg',32,10,1) returning *`))[0],
+  (await q(`insert into public.produce (item_id, category, name, unit, price_per_unit, qty_listed, min_order_qty) values ('tomato','vegetables','Tomato','kg',32,10,1) returning *`))[0],
 );
 check("listing created as active with 10 kg available", tomato.status === "active" && Number(tomato.qty_available) === 10);
 check("listing copies the farm's district", tomato.district === "Pune");
 check("ledger records the listing", (await as(FARMER, () => q(`select * from public.produce_log where produce_id = $1`, [tomato.id])))[0]?.change_type === "listed");
-await expectError("buyers cannot list produce", () => as(BUYER, () => q(`insert into public.produce (category, name, unit, price_per_unit, qty_listed) values ('fruits','Mango','kg',90,5)`)), "only_farmers_can_list");
+await expectError("buyers cannot list produce", () => as(BUYER, () => q(`insert into public.produce (item_id, category, name, unit, price_per_unit, qty_listed) values ('mango','fruits','Mango','kg',90,5)`)), "only_farmers_can_list");
 await expectError("farmers cannot edit stock counters directly", () => as(FARMER, () => q(`update public.produce set qty_sold = 5 where id = $1`, [tomato.id])), "permission denied");
-await expectError("farmers cannot set their own farmer_id on insert", () => as(FARMER, () => q(`insert into public.produce (farmer_id, category, name, unit, price_per_unit, qty_listed) values ($1,'fruits','Mango','kg',90,5)`, [FARMER2])), "permission denied");
+await expectError("farmers cannot set their own farmer_id on insert", () => as(FARMER, () => q(`insert into public.produce (farmer_id, item_id, category, name, unit, price_per_unit, qty_listed) values ($1,'mango','fruits','Mango','kg',90,5)`, [FARMER2])), "permission denied");
 const buyerEdit = await as(BUYER, () => q(`update public.produce set price_per_unit = 1 where id = $1 returning id`, [tomato.id]));
 check("buyers cannot edit a farmer's listing", buyerEdit.length === 0);
 
@@ -128,7 +129,7 @@ await expectError("visitors cannot read open demand", () => as(null, () => q(`se
 await expectError("visitors cannot place orders", () => as(null, () => q(`select public.place_order('[]'::jsonb, '{}'::jsonb)`)), "permission denied");
 
 console.log("\nordering");
-const delivery = JSON.stringify({ name: "Anita Rao", phone: "9000000000", line1: "12 MG Road", village_city: "Pune", district: "Pune", state: "Maharashtra", pincode: "411001", notes: "Gate 2" });
+const delivery = JSON.stringify({ name: "Anita Rao", phone: "9000000000", line1: "12 MG Road", village_city: "Narayangaon", district: "Pune", state: "Maharashtra", pincode: "410504", lat: 19.115, lng: 73.975, notes: "Gate 2" });
 const placed = await as(BUYER, () => q(`select public.place_order($1::jsonb, $2::jsonb) as r`, [JSON.stringify([{ produce_id: tomato.id, quantity: 4 }]), delivery]));
 const orderId = placed[0].r.orders[0].order_id;
 check("order placed with the right total", Number(placed[0].r.orders[0].total) === 128);
@@ -173,7 +174,7 @@ t = (await q(`select * from public.produce where id = $1`, [tomato.id]))[0];
 check("farmer reject releases stock", Number(t.qty_available) === 6 && Number(t.qty_reserved) === 0);
 
 console.log("\nmulti-farmer checkout");
-const wheat = await as(FARMER2, async () => (await q(`insert into public.produce (category, name, unit, price_per_unit, qty_listed, min_order_qty) values ('grains','Wheat','quintal',2400,20,2) returning *`))[0]);
+const wheat = await as(FARMER2, async () => (await q(`insert into public.produce (item_id, category, name, unit, price_per_unit, qty_listed, min_order_qty) values ('wheat','grains','Wheat','quintal',2400,20,2) returning *`))[0]);
 await expectError("minimum order is enforced", () => as(BUYER, () => q(`select public.place_order($1::jsonb, $2::jsonb)`, [JSON.stringify([{ produce_id: wheat.id, quantity: 1 }]), delivery])), "below_min_order");
 const multi = (await as(BUYER, () => q(`select public.place_order($1::jsonb, $2::jsonb) as r`, [JSON.stringify([{ produce_id: tomato.id, quantity: 1 }, { produce_id: wheat.id, quantity: 2 }]), delivery])))[0].r;
 check("one checkout with two farmers makes two orders", multi.orders.length === 2);
