@@ -315,22 +315,22 @@
     {
       "name": "role",
       "value": "{khet}",
-      "usage": "Chrome color of the current side: khet in the farmer area, neel in the buyer area. Buyer area: {neel}."
+      "usage": "Chrome color of the current side: primary buttons, selected nav, checked controls. Farmer area: khet; buyer area: neel."
     },
     {
       "name": "role-hover",
       "value": "{khet-hover}",
-      "usage": "Hover state of role fills. Buyer area: {neel-hover}."
+      "usage": "Hover state of role fills. Farmer area: khet-hover; buyer area: neel-hover."
     },
     {
       "name": "role-soft",
       "value": "{khet-soft}",
-      "usage": "Tint of the current side: nav highlight, selected cards. Buyer area: {neel-soft}."
+      "usage": "Tint of the current side: nav highlight, selected cards. Farmer area: khet-soft; buyer area: neel-soft."
     },
     {
       "name": "on-role",
       "value": "{on-khet}",
-      "usage": "Text and icons on role fills. Buyer area: {on-neel}."
+      "usage": "Text and icons on role fills. Farmer area: on-khet; buyer area: on-neel."
     }
   ],
   "spacing": [

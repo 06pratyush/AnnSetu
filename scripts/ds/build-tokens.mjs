@@ -35,7 +35,7 @@ const colors = light.filter((t) => isColor(t.value)).map((t) => ({
   usage: t.usage,
 }));
 const roleUsage = {
-  role: "Chrome color of the current side: khet in the farmer area, neel in the buyer area.",
+  role: "Chrome color of the current side: primary buttons, selected nav, checked controls.",
   "role-hover": "Hover state of role fills.",
   "role-soft": "Tint of the current side: nav highlight, selected cards.",
   "on-role": "Text and icons on role fills.",
@@ -83,7 +83,13 @@ const typeGroups = [
 const tokens = {
   name: "AnnSetu",
   version: 1,
-  meta: { source: "code", paths: { tokens: ["src/styles/tokens.css", "src/app/globals.css"] }, synced: new Date().toISOString().slice(0, 10) },
+  meta: {
+    source: "github",
+    repo: "06pratyush/AnnSetu",
+    ref: process.env.DS_REF ?? "main",
+    paths: { tokens: ["src/styles/tokens.css", "src/app/globals.css"], docs: ["design-system/project/README.md", "scripts/ds/components.mjs"] },
+    synced: new Date().toISOString().slice(0, 10),
+  },
   color: { themes: [{ id: "light", name: "Light" }, { id: "dark", name: "Dark" }], tokens: colors },
   type: { fonts: [], families, groups: typeGroups },
   spacing: { tokens: spacing },
