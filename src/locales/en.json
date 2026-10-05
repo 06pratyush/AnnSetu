@@ -87,8 +87,7 @@
     "buyer2Title": "Bulk requirements",
     "buyer2Body": "Restaurants, shops and mills can post what they need and when.",
     "buyer3Title": "Pay on delivery",
-    "buyer3Body": "No online payment needed. Pay the farmer in cash when the order arrives.",
-    "footer": "AnnSetu is a college project built with open-source tools."
+    "buyer3Body": "No online payment needed. Pay the farmer in cash when the order arrives."
   },
   "auth": {
     "loginTitle": "Welcome back",

@@ -152,8 +152,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-small text-ink-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>{t("landing.footer")}</p>
+        <div className="mx-auto flex max-w-6xl justify-end px-4 py-6 text-small">
           <Link href="/design-system" className="font-semibold text-ink underline-offset-4 hover:underline">
             {t("nav.designSystem")}
           </Link>
