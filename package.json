@@ -11,7 +11,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "prove": "vitest run -c vitest.proofs.config.mts",
+    "prove": "vitest run -c vitest.proofs.config.mts && node scripts/proofs-report.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:db": "node scripts/db-test.mjs",

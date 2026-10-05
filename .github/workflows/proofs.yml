@@ -1,0 +1,42 @@
+name: Proofs
+
+# The theorems in proofs/ (Z3) and the checks that tie them to the code and the database.
+# The report appears on the run's summary page and as an artifact. Kept apart from the deploy so
+# a slow solver run never holds up the site.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prove
+        run: npm run prove
+
+      - name: Report
+        if: always()
+        run: test -f proofs/REPORT.md && cat proofs/REPORT.md >> "$GITHUB_STEP_SUMMARY" || echo "No report was written." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: proof-report
+          path: |
+            proofs/REPORT.md
+            proofs/results/

@@ -146,6 +146,18 @@ Built from the design doc *ANN Setu: Matching Algorithms*. Five steps, each in t
 - **Busy-morning simulation** (320 buyers): without the engine, 16% of buyers are served, with phantom stock. With the live list and one-step reserve, 100% are served.
 - **Speed**: 90,000 active listings, 95% of requests answered under 31 ms.
 
+## Proofs
+
+`npm run prove` proves the product's promises for **every** possible input with the [Z3](https://github.com/Z3Prover/z3) SMT solver, and checks that each model behaves exactly like the shipped code and database. Results: [`proofs/REPORT.md`](proofs/REPORT.md) (40 theorems proved, 11 checks passed). The **Proofs** workflow reruns them on every push.
+
+- **Search:** a name typed with one mistake is always found, for every stored spelling of 3 or more letters. All 64,805 such typos of the catalogue's spellings were tried; every one finds its item, in the first three results.
+- **Matching:** a listing is shown exactly when it keeps every hard rule. Everything shown arrives with at least 40% of its shelf life left. Scores stay within 0-100, and cheaper, fresher, nearer and more reliable never scores lower. A new farmer ranks at or above any otherwise-identical farmer who is on time 80% of the time or less.
+- **Stock:** no order, status change or stock correction can make stock negative or lose track of it, and each order gives its stock back exactly once. With the database's row locks, that holds for orders arriving at the same instant. The database allows exactly the status changes in the model (all 128 checked).
+- **Shared trips:** no household pays more than the shop, delivery included; the fees add up to the trip cost to the paisa whenever the trip pays for itself.
+- **Suggested rate:** never below the mandi price; never above the shop price minus delivery; a whole number of paise; never lower for more demand, fresher produce, a dearer shop or a higher mandi price.
+
+The proofs also found **4 problems** in the version deployed before them, each kept in the report as a counterexample: the rate could round a fraction of a paisa past its ceiling; weight-based trip splitting could make a household pay more than the shop; and two settings combinations (score weights not adding up to 1, farmer share + nudge cap over 1) broke the score range and the rate's direction. All four are fixed.
+
 ## Scripts
 
 | Command | What it does |
@@ -154,6 +166,7 @@ Built from the design doc *ANN Setu: Matching Algorithms*. Five steps, each in t
 | `npm run build` | Static export to `out/` |
 | `npm run check` | Typecheck, lint, translation parity, colour contrast, database tests, engine tests |
 | `npm test` | Matching engine: search, rules, score, rate, the database against the reference, the doc's cases, speed, the price feed |
+| `npm run prove` | The proofs (Z3) and the checks that tie them to the code; writes `proofs/REPORT.md` (about 9 minutes) |
 | `npm run test:db` | Runs every migration on in-memory Postgres and checks 58 rules: order flow, stock maths, who can see and change what |
 | `npm run test:e2e` | Playwright: a farmer, a restaurant and a household trade end to end. In demo mode they take turns in one browser (`e2e/demo.spec.ts`); with `E2E_SUPABASE=1` and a Supabase project they use three browsers at once. `E2E_CHANNEL=msedge` uses the installed Edge |
 | `npm run check:i18n` | Every English key has a Hindi twin, and every key used in code exists |
@@ -192,7 +205,8 @@ supabase/catalogue.json  80 items: names in English, Hinglish and Hindi, units, 
 scripts/                 checks, database tests, catalogue + design-system builds, prices/ (mandi feed)
 tests/                   engine tests against in-memory Postgres
 e2e/                     Playwright test
-.github/workflows/       deploy to Pages, mandi prices, keep Supabase awake
+proofs/                  the proofs: models of the engine, theorems for Z3, checks against code and database
+.github/workflows/       deploy to Pages, proofs, mandi prices, keep Supabase awake
 ```
 
 ## Limits worth knowing (free tiers)
