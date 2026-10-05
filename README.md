@@ -55,6 +55,18 @@ There is no server code to protect, so security lives in the database:
 | Tests | Vitest + PGlite (Postgres in WASM) for the engine and database rules, Playwright for end to end |
 | Hosting | GitHub Pages (free) + Supabase free tier |
 
+## Try it without any setup: demo mode
+
+Until a Supabase project is connected, AnnSetu runs in **demo mode**: the whole database (every migration, security rule and function in `supabase/migrations`) runs inside the browser in [PGlite](https://pglite.dev), Postgres compiled to WebAssembly, and is saved in that browser's storage. Sign up, list produce, order, accept and deliver: everything works, for anyone opening the site.
+
+- A banner says so on every page. Data stays in that one browser, so two people on two phones don't see each other; take turns in one browser (sign out, sign in as the other person), or connect Supabase.
+- The first visit downloads PGlite from the jsDelivr CDN (about 5 MB) and sets up the database in a few seconds; later visits open it from storage.
+- So the market isn't empty, demo farms appear around Jaipur on the first visit, and around anyone who saves an address or taps **Show farms near me**. They're marked by an `@annsetu.demo` email and nobody can sign in as them.
+- No emails are sent in demo mode, so "Forgot password" explains that instead.
+- Open in one tab at a time; a second tab says the demo is open elsewhere.
+
+Connecting Supabase (below) switches demo mode off; nothing else changes.
+
 ## Set it up
 
 ### 1. Supabase (database + login)
@@ -110,7 +122,7 @@ Built from the design doc *ANN Setu: Matching Algorithms*. Five steps, each in t
 | 4. Live stock | The list is read live. The order reserves stock in one step under row locks, re-checking the rules at order time. | `place_order` | |
 | 5. Rate | Lowest fair price = mandi; highest = shop − delivery per unit; the farmer gets half the room between them, nudged by local demand (only with 20+ open requests, at most a quarter of the room), cut as produce ages and for big lots (5% per 100 units, at most 5%), and kept within the bounds. | `rate_inputs` | `src/lib/matching/rate.ts` |
 
-**Shared trips for households.** Household orders to one farm and one PIN code wait in a delivery batch. A trip costs `2 × 1.3 × km × ₹10` (there and back, road distance, with km rounded to whole kilometres so exact locations stay private). The batch goes to the farmer as soon as the households' combined saving against the shop (quantity × (shop − price)) covers the trip. At that point the households together pay less than the shop, delivery included. If that doesn't happen within 24 hours, the batch is sent anyway, marked "below break-even", and the farmer decides. Each household's fee is the trip cost split by weight. A business order is one trip of its own and goes straight to the farmer.
+**Shared trips for households.** Household orders to one farm and one PIN code wait in a delivery batch. A trip costs `2 × 1.3 × km × ₹10` (there and back, road distance, with km rounded to whole kilometres so exact locations stay private). Each household's saving is what it would have paid the shop minus what it pays the farm. The batch goes to the farmer as soon as the households' savings together cover the trip; the trip cost is then split in proportion to each household's saving, in whole paise that add up exactly to the trip cost. If that doesn't happen within 24 hours, the batch goes anyway, marked "below break-even": each household pays its saving and no more, and the farmer sees the total before deciding. Either way, **no household ever pays more than the shop for the same goods, delivery included**, and checkout shows the most it can pay ("up to ₹X"). A business order is one trip of its own and goes straight to the farmer.
 
 **Area rules, never people.** Festival-time or local rules (hide an item, or nudge demand up or down) are set by an admin for an area and a date range in `area_rules`. The engine never guesses or stores anything about a buyer as a person; the only buyer preferences are ones the buyer states.
 
@@ -143,7 +155,7 @@ Built from the design doc *ANN Setu: Matching Algorithms*. Five steps, each in t
 | `npm run check` | Typecheck, lint, translation parity, colour contrast, database tests, engine tests |
 | `npm test` | Matching engine: search, rules, score, rate, the database against the reference, the doc's cases, speed, the price feed |
 | `npm run test:db` | Runs every migration on in-memory Postgres and checks 58 rules: order flow, stock maths, who can see and change what |
-| `npm run test:e2e` | Playwright: a farmer, a restaurant and a household signed in at once trade end to end (needs a Supabase project with email confirmation off) |
+| `npm run test:e2e` | Playwright: a farmer, a restaurant and a household trade end to end. In demo mode they take turns in one browser (`e2e/demo.spec.ts`); with `E2E_SUPABASE=1` and a Supabase project they use three browsers at once. `E2E_CHANNEL=msedge` uses the installed Edge |
 | `npm run check:i18n` | Every English key has a Hindi twin, and every key used in code exists |
 | `npm run check:contrast` | Every text/background token pair meets WCAG AA in light and dark |
 | `npm run db:bundle` | Rebuilds `supabase/setup.sql` from `supabase/migrations/` |

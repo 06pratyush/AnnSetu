@@ -6,10 +6,9 @@ import { Suspense, useEffect, useState } from "react";
 import { MailCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { homeFor, useAuth } from "@/lib/auth/auth-provider";
-import { ConfigMissing } from "@/lib/auth/role-guard";
 import { errorMessage } from "@/lib/errors";
 import { useLang } from "@/lib/i18n/provider";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { appUrl } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -79,7 +78,6 @@ function SignupForm() {
     else setSentTo(email.trim());
   }
 
-  if (!isSupabaseConfigured) return <ConfigMissing />;
 
   if (sentTo) {
     return (

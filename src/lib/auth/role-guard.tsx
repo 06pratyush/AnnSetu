@@ -4,9 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ShieldAlert, DatabaseZap } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { homeFor, useAuth } from "./auth-provider";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import type { Role } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
@@ -27,11 +26,6 @@ export function PageSkeleton() {
   );
 }
 
-export function ConfigMissing() {
-  const { t } = useTranslation();
-  return <EmptyState icon={DatabaseZap} title={t("errors.configTitle")} body={t("errors.configMissing")} />;
-}
-
 /**
  * Client-side gate for signed-in areas: sends visitors to sign in, unfinished profiles to onboarding,
  * and shows a clear message on the wrong side of the bridge. Row-level security is the real boundary.
@@ -43,12 +37,11 @@ export function RoleGuard({ role, children, allowUnonboarded = false }: { role?:
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!isSupabaseConfigured || status !== "ready") return;
+    if (status !== "ready") return;
     if (!session) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     else if (profile && !profile.onboarded && !allowUnonboarded) router.replace("/onboarding");
   }, [status, session, profile, allowUnonboarded, pathname, router]);
 
-  if (!isSupabaseConfigured) return <ConfigMissing />;
   if (status === "loading" || !session) return <PageSkeleton />;
   if (!profile) {
     return (

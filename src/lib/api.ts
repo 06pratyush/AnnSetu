@@ -1,6 +1,6 @@
 // Thin data layer over Supabase. Every call runs as the signed-in user and is checked by
 // row-level security; writes that touch stock or orders go through the Postgres functions.
-import { STORAGE_BUCKETS, supabase } from "./supabase";
+import { isDemo, STORAGE_BUCKETS, supabase } from "./supabase";
 import type { CatalogueItem } from "./matching/search";
 import type {
   Address,
@@ -115,8 +115,15 @@ export async function saveDefaultAddress(userId: string, a: AddressInput): Promi
     lng: a.lng,
     is_default: true,
   };
-  if (existing) return must(await supabase.from("addresses").update(row).eq("id", existing.id).select().single());
-  return must(await supabase.from("addresses").insert(row).select().single());
+  const saved: Address = existing
+    ? must(await supabase.from("addresses").update(row).eq("id", existing.id).select().single())
+    : must(await supabase.from("addresses").insert(row).select().single());
+  // Demo mode: make sure there are a few made-up farms and buyers nearby to try things with.
+  if (isDemo && a.lat !== null && a.lng !== null) {
+    const { addDemoNeighbours } = await import("./demo/neighbours");
+    await addDemoNeighbours({ lat: a.lat, lng: a.lng, district: row.district, state: row.state, pincode: row.pincode }).catch((err) => console.warn("demo neighbours", err));
+  }
+  return saved;
 }
 
 export async function uploadPhoto(bucket: keyof typeof STORAGE_BUCKETS, userId: string, file: File): Promise<string> {
@@ -287,6 +294,7 @@ export async function quoteDelivery(items: { produce_id: string; quantity: numbe
     my_load: Number(q.my_load),
     my_room: Number(q.my_room),
     fee_now: num(q.fee_now) as number | null,
+    fee_max: num(q.fee_max) as number | null,
   }));
 }
 

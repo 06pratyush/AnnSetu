@@ -41,7 +41,11 @@ function DeliveryQuotes({ lines, quotes, loading }: { lines: CartLine[]; quotes:
               {q.pooled ? <Users className="size-5 shrink-0 text-ink-muted" aria-hidden /> : <Truck className="size-5 shrink-0 text-ink-muted" aria-hidden />}
               <span className="truncate">{names.get(q.farmer_id)}</span>
             </span>
-            {q.fee_now !== null && !q.problem ? <span className="font-semibold text-ink tabular-nums">{f.money(q.fee_now)}</span> : null}
+            {q.problem ? null : q.fee_now !== null ? (
+              <span className="font-semibold text-ink tabular-nums">{f.money(q.fee_now)}</span>
+            ) : q.fee_max !== null ? (
+              <span className="text-ink tabular-nums">{t("checkout.upTo", { amount: f.money(q.fee_max) })}</span>
+            ) : null}
           </p>
           {q.problem ? (
             <Alert tone="danger">{t(`checkout.problem.${q.problem}`, { name: q.problem_item ?? "" })}</Alert>
@@ -50,7 +54,7 @@ function DeliveryQuotes({ lines, quotes, loading }: { lines: CartLine[]; quotes:
               <p className="text-small text-ink-muted">
                 {q.ships_now
                   ? t("checkout.sharedShipsNow", { km: f.number(q.distance_km ?? 0), trip: f.money(q.trip_cost ?? 0) })
-                  : t("checkout.sharedWaiting", { km: f.number(q.distance_km ?? 0), trip: f.money(q.trip_cost ?? 0) })}
+                  : t("checkout.sharedWaiting", { km: f.number(q.distance_km ?? 0), trip: f.money(q.trip_cost ?? 0), max: f.money(q.fee_max ?? 0) })}
               </p>
               {q.cutoff_at ? (
                 <BatchProgress

@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ConfigMissing } from "@/lib/auth/role-guard";
 import { errorMessage } from "@/lib/errors";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isDemo, supabase } from "@/lib/supabase";
 import { appUrl } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -34,7 +33,6 @@ export default function ForgotPasswordPage() {
     else setSent(true);
   }
 
-  if (!isSupabaseConfigured) return <ConfigMissing />;
 
   return (
     <Card>
@@ -43,7 +41,9 @@ export default function ForgotPasswordPage() {
         <p className="text-body text-ink-muted">{t("auth.resetBody")}</p>
       </CardHeader>
       <CardContent>
-        {sent ? (
+        {isDemo ? (
+          <Alert tone="info">{t("demo.noEmailReset")}</Alert>
+        ) : sent ? (
           <Alert tone="success">{t("auth.resetSent", { email: email.trim() })}</Alert>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>

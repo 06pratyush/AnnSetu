@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/bundle-sql.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/bundle-sql.mjs",
     "build": "next build",
     "start": "serve out",
     "lint": "eslint",

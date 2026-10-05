@@ -5,9 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { homeFor, useAuth } from "@/lib/auth/auth-provider";
-import { ConfigMissing } from "@/lib/auth/role-guard";
 import { errorMessage } from "@/lib/errors";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -42,7 +41,6 @@ function LoginForm() {
     if (err) setError(errorMessage(err, t));
   }
 
-  if (!isSupabaseConfigured) return <ConfigMissing />;
 
   return (
     <Card>

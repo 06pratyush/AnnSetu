@@ -127,7 +127,10 @@ export function ProduceRow({
         <ProducePhoto src={produce.images[0]} category={produce.category} alt="" className="w-20 shrink-0 sm:w-24" iconClassName="size-7" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-h3 font-semibold text-ink">{produce.name}</h3>
+            <h3 className="font-display text-h3 font-semibold text-ink">
+              {produce.name}
+              {produce.variety ? <span className="font-body text-body font-normal text-ink-muted"> · {produce.variety}</span> : null}
+            </h3>
             <ProduceStatusBadge status={produce.status} />
             {produce.is_organic ? <OrganicBadge /> : null}
           </div>

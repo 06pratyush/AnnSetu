@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { homeFor, useAuth } from "@/lib/auth/auth-provider";
-import { ConfigMissing, PageSkeleton } from "@/lib/auth/role-guard";
+import { PageSkeleton } from "@/lib/auth/role-guard";
 import { errorMessage } from "@/lib/errors";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -40,7 +40,6 @@ export default function ResetPasswordPage() {
     router.replace(homeFor(profile));
   }
 
-  if (!isSupabaseConfigured) return <ConfigMissing />;
   if (status === "loading") return <PageSkeleton />;
 
   return (

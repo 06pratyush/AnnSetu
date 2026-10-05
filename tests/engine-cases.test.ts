@@ -114,7 +114,8 @@ describe("Case 4 and the grouping step: households sharing one trip", () => {
     }
     const first = await rows<{ status: string; delivery_fee: string }>(db, `select status, delivery_fee from public.orders where batch_id = $1`, [firstBatch]);
     expect(first).toHaveLength(8);
-    expect(first.every((o) => o.status === "placed" && Number(o.delivery_fee) === 65)).toBe(true); // 520 x 3 / 24
+    // Equal savings, equal shares: 520 / 8 = 65 each, adding up to the trip cost exactly.
+    expect(first.every((o) => o.status === "placed" && Number(o.delivery_fee) === 65)).toBe(true);
     const batch = (await rows<{ status: string; below_break_even: boolean; load_qty: string; trip_cost: string }>(db, `select * from public.delivery_batches where id = $1`, [firstBatch]))[0];
     expect(batch).toMatchObject({ status: "released", below_break_even: false });
     expect(Number(batch.trip_cost)).toBe(520);
@@ -132,8 +133,9 @@ describe("Case 4 and the grouping step: households sharing one trip", () => {
     expect(q).toHaveLength(1);
     expect(q[0].pooled).toBe(true);
     expect(Number(q[0].batch_load)).toBe(12); // households 9-12
-    expect(Number(q[0].fee_now)).toBe(104); // 520 x 3 / 15
     expect(q[0].ships_now).toBe(false);
+    expect(q[0].fee_now).toBeNull(); // the trip is still forming
+    expect(Number(q[0].fee_max)).toBe(67.95); // never more than its saving: 3 x (45 - 22.35)
 
     // A PIN code with no open batch: this order would open one, closing a window (24 h) from now.
     const fresh = await as(db, hh, () =>
@@ -152,7 +154,28 @@ describe("Case 4 and the grouping step: households sharing one trip", () => {
     const b = (await rows<{ id: string; below_break_even: boolean; status: string }>(db, `select * from public.delivery_batches where status = 'released' order by released_at desc limit 1`))[0];
     expect(b).toMatchObject({ status: "released", below_break_even: true });
     const fees = await rows<{ delivery_fee: string }>(db, `select delivery_fee from public.orders where batch_id = $1`, [b.id]);
-    expect(fees.map((f) => Number(f.delivery_fee))).toEqual([130, 130, 130, 130]); // 520 x 3 / 12
+    // Savings 4 x 67.95 = 271.80 do not cover the Rs 520 trip: each home pays its saving, no more.
+    expect(fees.map((f) => Number(f.delivery_fee))).toEqual([67.95, 67.95, 67.95, 67.95]);
+  });
+
+  it("splits a mixed trip by each home's saving, so nobody pays more than the shop", async () => {
+    // Shop Rs 45 for tomatoes. Home 1 buys at Rs 44 (saves Rs 1/kg), homes 2 and 3 at Rs 20 (save Rs 25/kg).
+    const dear = await listing("tomato", 44, 100, 1);
+    const cheap = await listing("tomato", 20, 100, 1);
+    const at = north(20);
+    const pin = "302003";
+    const h1 = await order(await buyer("individual", 30), dear, 10, at, pin);
+    const h2 = await order(await buyer("individual", 30), cheap, 10, at, pin);
+    const h3 = await order(await buyer("individual", 30), cheap, 12, at, pin); // savings 10 + 250 + 300 = 560 >= 520
+    expect([h1.status, h2.status, h3.status]).toEqual(["pooling", "pooling", "placed"]);
+    const fees = await rows<{ id: string; delivery_fee: string }>(db, `select id, delivery_fee from public.orders where batch_id = $1 order by created_at`, [h1.batch!.id]);
+    const fee = (id: string) => Number(fees.find((f) => f.id === id)!.delivery_fee);
+    // 520 x 10/560, 520 x 250/560, 520 x 300/560 in whole paise: 9.29, 232.14, 278.57, adding up to 520.00.
+    expect([fee(h1.order_id), fee(h2.order_id), fee(h3.order_id)]).toEqual([9.29, 232.14, 278.57]);
+    expect(Math.round(fees.reduce((s, f) => s + Number(f.delivery_fee), 0) * 100)).toBe(52000);
+    // Home 1 pays 440 + 9.29 = 449.29 for 10 kg, under the shop's 450. Split by weight it would have
+    // paid 440 + 520 x 10/32 = 602.50.
+    expect(440 + fee(h1.order_id)).toBeLessThanOrEqual(450);
   });
 
   it("a household leaving a batch frees its stock and shrinks the batch", async () => {

@@ -32,7 +32,8 @@ export function RoleChoiceCards({
   return (
     <RadioGroup.Root
       name={name}
-      value={value ?? undefined}
+      // "" (nothing chosen yet) keeps the group controlled from the first render.
+      value={value ?? ""}
       onValueChange={(v) => onChange(v as AccountChoice)}
       aria-label={t("auth.chooseRole")}
       className={cn("grid gap-3 sm:grid-cols-3", className)}

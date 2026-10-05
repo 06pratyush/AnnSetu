@@ -6,7 +6,6 @@ import { getCatalogue, getEngineSettings } from "@/lib/api";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useLang } from "@/lib/i18n/provider";
 import { useDefaultAddress } from "@/lib/queries";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { SEED_CATALOGUE } from "./catalogue-data";
 import { indexCatalogue, type CatalogueItem } from "./search";
 import { DEFAULT_SETTINGS, settingsFromRow } from "./settings";
@@ -16,7 +15,6 @@ export function useCatalogue() {
   const q = useQuery({
     queryKey: ["catalogue"],
     queryFn: getCatalogue,
-    enabled: isSupabaseConfigured,
     staleTime: Infinity,
     gcTime: Infinity,
   });
@@ -28,7 +26,7 @@ export function useCatalogue() {
 }
 
 export function useEngineSettings() {
-  const q = useQuery({ queryKey: ["engine-settings"], queryFn: getEngineSettings, enabled: isSupabaseConfigured, staleTime: 10 * 60_000 });
+  const q = useQuery({ queryKey: ["engine-settings"], queryFn: getEngineSettings, staleTime: 10 * 60_000 });
   return useMemo(() => (q.data ? settingsFromRow(q.data) : DEFAULT_SETTINGS), [q.data]);
 }
 

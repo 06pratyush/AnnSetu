@@ -6,6 +6,10 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 // share a trip with neighbours. The restaurant rates the order and posts a requirement that reaches
 // the farmer's demand panel.
 
+// Three browsers share one database, so this needs a Supabase project: E2E_SUPABASE=1 npm run test:e2e.
+// Without one, demo.spec.ts runs the same story in demo mode.
+test.skip(!process.env.E2E_SUPABASE, "needs a Supabase project (set E2E_SUPABASE=1)");
+
 const run = Date.now().toString(36);
 const VARIETY = `E2E ${run}`;
 const BUSINESS = `Hotel ${run}`;
@@ -50,6 +54,8 @@ async function onboard(page: Page, phone: string, business?: string) {
   await expect(page.getByLabel("PIN code")).toHaveValue("411005");
   await page.getByLabel("House or farm, street").fill("Plot 7, Market Road");
   await page.getByRole("button", { name: "Finish setup" }).click();
+  // Saved once the app leaves onboarding for the person's home page.
+  await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"), { timeout: 60_000 });
 }
 
 /** From the market: search, say how much, open this run's listing, add it to the cart and check out. */

@@ -265,7 +265,7 @@ describe("score", () => {
       return { given: scoreDomain(x), claim: Z.And(...all), watch: { onTime: x.onTime, completed: x.completed } };
     },
   );
-  const average = (weightsSumToOne: boolean) => (Z: Context<P>, D: Dom<ZNum, ZBool>) => {
+  const average = (weightsSumToOne: boolean) => (Z: Context<P>) => {
     const w = ["wPrice", "wFresh", "wNear", "wTrust", "wFill"].map((n) => Z.Real.const(n));
     const p = ["price", "fresh", "near", "trust", "fill"].map((n) => Z.Real.const(n));
     const sum = w.map((wi, k) => wi.mul(p[k])).reduce((a, b) => a.add(b));

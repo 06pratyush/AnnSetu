@@ -388,8 +388,8 @@
     "rejectTrip": "Reject trip",
     "tripTitle_one": "Trip to PIN {{pin}} · {{count}} home",
     "tripTitle_other": "Trip to PIN {{pin}} · {{count}} homes",
-    "tripMeta": "{{km}} km · {{load}} kg · delivery {{fee}} in total, shared by the homes",
-    "belowBreakEven": "This trip closed at its cut-off before the homes' savings covered it. Accept only if the trip still suits you.",
+    "tripMeta": "{{km}} km · {{load}} kg · the homes pay {{fee}} for delivery",
+    "belowBreakEven": "This trip closed at its cut-off before the homes' savings covered it: they pay {{paid}} towards the {{trip}} trip. Accept only if the trip still suits you.",
     "formingTitle_one": "{{count}} shared trip forming",
     "formingTitle_other": "{{count}} shared trips forming",
     "formingBody": "Household orders wait here until together they pay for the trip, or until the cut-off.",
@@ -476,7 +476,7 @@
     "deliveryTitle": "Delivery",
     "needPin": "Set your delivery spot on the map: tap it or use your location.",
     "oneTrip": "One trip of {{km}} km there and back, paid to the farmer with the order.",
-    "sharedWaiting": "Shared with other homes in your PIN code: a {{km}} km trip costing {{trip}} in all. Your share falls as neighbours join.",
+    "sharedWaiting": "Shared with other homes in your PIN code: a {{km}} km trip costing {{trip}} in all. Your share falls as neighbours join, and is never more than what you save against the shop ({{max}}).",
     "sharedShipsNow": "Your order completes a shared {{km}} km trip ({{trip}} in all). It goes to the farmer now.",
     "pooledNote_one": "1 order is waiting to share a trip with neighbours.",
     "pooledNote_other": "{{count}} orders are waiting to share trips with neighbours.",
@@ -486,7 +486,8 @@
       "no_location": "This farm has no location yet, so it can't deliver.",
       "not_fresh_on_arrival": "{{name}} wouldn't arrive fresh at your address.",
       "hidden_in_area": "{{name}} isn't offered in your area today."
-    }
+    },
+    "upTo": "up to {{amount}}"
   },
   "requirements": {
     "title": "Requirements",
@@ -666,5 +667,13 @@
       "bigLot": "After big-lot cut",
       "final": "Suggested price"
     }
+  },
+  "demo": {
+    "banner": "Demo mode: everything you do is saved in this browser only. The nearby farms and buyers marked as demo are made up.",
+    "loading": "Setting up the demo database in your browser. The first visit takes a few seconds.",
+    "busy": "AnnSetu's demo is already open in another tab. Close that tab, then reload this one.",
+    "failed": "The demo database couldn't start. Check your internet connection and reload the page.",
+    "reload": "Reload",
+    "noEmailReset": "Demo mode sends no emails, so passwords can't be reset here. Create a new account instead; it takes a minute."
   }
 }

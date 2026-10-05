@@ -275,7 +275,10 @@ export interface DeliveryQuote {
   batch_room: number;
   my_load: number;
   my_room: number;
+  /** This order's share if the trip shipped with it; null while a household trip is still forming. */
   fee_now: number | null;
+  /** The most this order can ever pay for delivery: for a household, its saving against the shop. */
+  fee_max: number | null;
   ships_now: boolean;
   cutoff_at: string | null;
   problem: HiddenReason | null;

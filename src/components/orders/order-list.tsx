@@ -65,6 +65,8 @@ function TripCard({ orders, onAction, busy, renderFooter }: { orders: Order[]; o
   const common = statuses.size === 1 ? orders[0].status : null;
   const actions = common ? nextActions({ status: common }, "farmer", t).filter((a) => a.status !== "cancelled") : [];
   const target: Target = { kind: "batch", batchId: batch.id, orders };
+  // What the homes pay together: the trip cost once their savings cover it, less at a cut-off.
+  const paid = Math.round(orders.reduce((sum, o) => sum + (o.delivery_fee ?? 0), 0) * 100) / 100;
   return (
     <section className="flex flex-col gap-3 rounded-md border border-border bg-sunken p-3 md:col-span-2">
       <header className="flex flex-wrap items-start justify-between gap-3 px-1">
@@ -74,13 +76,13 @@ function TripCard({ orders, onAction, busy, renderFooter }: { orders: Order[]; o
             {t("orders.tripTitle", { pin: batch.pincode, count: orders.length })}
           </h3>
           <p className="text-small text-ink-muted">
-            {t("orders.tripMeta", { km: f.number(batch.distance_km ?? 0), load: f.number(batch.load_qty), fee: f.money(batch.trip_cost) })}
+            {t("orders.tripMeta", { km: f.number(batch.distance_km ?? 0), load: f.number(batch.load_qty), fee: f.money(paid) })}
           </p>
         </div>
         {common ? <OrderStatusBadge status={common} /> : null}
       </header>
       {batch.below_break_even && common === "placed" ? (
-        <Alert tone="warning">{t("orders.belowBreakEven")}</Alert>
+        <Alert tone="warning">{t("orders.belowBreakEven", { paid: f.money(paid), trip: f.money(batch.trip_cost) })}</Alert>
       ) : null}
       {actions.length ? (
         <div className="flex flex-wrap gap-3 px-1">

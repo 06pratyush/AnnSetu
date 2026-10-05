@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import type { BuyerDetails, FarmerDetails, Profile } from "@/lib/types";
 import { useLang } from "@/lib/i18n/provider";
 
@@ -40,14 +40,13 @@ async function fetchProfile(userId: string): Promise<FullProfile | null> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setLang } = useLang();
   const [session, setSession] = useState<Session | null>(null);
-  const [sessionLoaded, setSessionLoaded] = useState(!isSupabaseConfigured);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [profileLoadedFor, setProfileLoadedFor] = useState<string | null>(null);
   const [profileError, setProfileError] = useState(false);
   const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     let active = true;
     void supabase.auth.getSession().then(({ data }) => {
       if (!active) return;

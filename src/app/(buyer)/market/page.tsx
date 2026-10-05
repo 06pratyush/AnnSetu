@@ -5,14 +5,13 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { LocateFixed, SearchX, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { ConfigMissing } from "@/lib/auth/role-guard";
+import { isDemo } from "@/lib/supabase";
 import { matchHidden, matchListings, type MatchParams } from "@/lib/api";
-import { getCurrentPosition } from "@/lib/geo";
+import { getCurrentPosition, reverseGeocode, type LatLng } from "@/lib/geo";
 import { useFormat } from "@/lib/i18n/format";
 import { useLang } from "@/lib/i18n/provider";
 import { useBuyerContext, useCatalogue, useEngineSettings } from "@/lib/matching/hooks";
 import { searchCatalogue, type CatalogueItem } from "@/lib/matching/search";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import type { CategorySlug } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/misc";
@@ -21,6 +20,14 @@ import { EmptyState } from "@/components/domain/empty-state";
 import { CategoryChips, SearchFilterBar, type MarketSort } from "@/components/domain/market";
 import { HiddenNote, MatchCard } from "@/components/domain/matching";
 import { UnitInput } from "@/components/ui/input";
+
+/** Demo mode: make sure there are demo farms near where the visitor is (their area, if Nominatim knows it). */
+async function addDemoFarmsNear(p: LatLng, lang: "en" | "hi") {
+  const where = await reverseGeocode(p, lang).catch(() => ({}) as Awaited<ReturnType<typeof reverseGeocode>>);
+  const pin = /^[0-9]{6}$/.test(where.pincode ?? "") ? where.pincode! : "000000";
+  const { addDemoNeighbours } = await import("@/lib/demo/neighbours");
+  await addDemoNeighbours({ lat: p.lat, lng: p.lng, district: where.district ?? "", state: where.state ?? "", pincode: pin }).catch(() => {});
+}
 
 const PAGE = 24;
 
@@ -77,10 +84,10 @@ export default function MarketPage() {
   const results = useQuery({
     queryKey: ["match", params],
     queryFn: () => matchListings(params),
-    enabled: isSupabaseConfigured && buyer.ready,
+    enabled: buyer.ready,
     placeholderData: keepPreviousData,
   });
-  const hidden = useQuery({ queryKey: ["match-hidden", params], queryFn: () => matchHidden(params), enabled: isSupabaseConfigured && Boolean(item) && buyer.ready });
+  const hidden = useQuery({ queryKey: ["match-hidden", params], queryFn: () => matchHidden(params), enabled: Boolean(item) && buyer.ready });
 
   const rows = useMemo(() => {
     const list = [...(results.data ?? [])];
@@ -96,6 +103,7 @@ export default function MarketPage() {
     setLocating(true);
     try {
       const p = await getCurrentPosition();
+      if (isDemo) await addDemoFarmsNear(p, lang);
       setHere({ lat: p.lat, lng: p.lng });
     } catch {
       /* the list still works without a location, just without distance rules */
@@ -103,8 +111,6 @@ export default function MarketPage() {
       setLocating(false);
     }
   }
-
-  if (!isSupabaseConfigured) return <ConfigMissing />;
 
   return (
     <>
