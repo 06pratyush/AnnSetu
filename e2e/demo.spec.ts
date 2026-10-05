@@ -1,11 +1,11 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { isDemoMode } from "./mode";
 
 // Demo mode (no Supabase project configured): the database lives in the browser, so the people
 // take turns in one browser instead of having one each. A farmer lists tomatoes (typed in Hinglish),
 // a restaurant orders, the farmer promises a time and delivers, and the stock log adds up. A
 // household's order waits to share a trip. The restaurant rates the order and posts a requirement
 // that reaches the farmer's demand panel. The multi-browser version is marketplace.spec.ts.
-test.skip(Boolean(process.env.E2E_SUPABASE), "demo mode only; E2E_SUPABASE=1 runs marketplace.spec.ts against Supabase");
 
 const run = Date.now().toString(36);
 const VARIETY = `E2E ${run}`;
@@ -87,7 +87,8 @@ async function buy(page: Page, kg: number) {
   await expect(page.getByText("Order placed").first()).toBeVisible();
 }
 
-test("farmer and buyers trade in demo mode", async ({ page, context }) => {
+test("farmer and buyers trade in demo mode", async ({ page, context, baseURL }) => {
+  test.skip(!(await isDemoMode(baseURL)), "the app is connected to Supabase: marketplace.spec.ts runs instead");
   test.setTimeout(300_000);
   await setUp(context);
   // Surface the page's own warnings and errors in the test output.

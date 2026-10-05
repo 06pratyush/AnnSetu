@@ -79,12 +79,12 @@ Until this is done, the site says it isn't connected to its database.
 4. **Authentication → URL Configuration**:
    - **Site URL**: `https://<your-github-user>.github.io/<repo-name>/`
    - **Redirect URLs**: add `https://<your-github-user>.github.io/<repo-name>/**` and `http://localhost:3000/**`
-5. Copy the **Project URL** (Project Settings → Data API) and the **publishable** key (Project Settings → API Keys; the legacy `anon` key works too). Both are public by design. Never put the secret / `service_role` key in the app.
+5. Click **Connect** at the top of the project and choose **Next.js**: it shows the **Project URL** and the **publishable key** (`sb_publishable_…`; also under Settings → API Keys). Both are public by design. Never put the secret key (`sb_secret_…`) or the old `service_role` key in the app.
 
 ### 2. Run it locally
 
 ```bash
-cp .env.example .env.local   # then paste the URL and publishable key
+cp .env.example .env.local   # then paste the two lines from Connect; without it, demo mode
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -92,7 +92,7 @@ npm run dev                  # http://localhost:3000
 ### 3. Deploy to GitHub Pages
 
 1. Push this folder to a GitHub repository. It must be public for free GitHub Pages.
-2. **Settings → Secrets and variables → Actions → Variables**: add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the publishable key). Repository secrets with the same names work too.
+2. **Settings → Secrets and variables → Actions → Variables**: add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the older name `NEXT_PUBLIC_SUPABASE_ANON_KEY` works too, as do secrets). The deploy checks that the database is set up first; until `setup.sql` has run, it keeps building demo mode and says so in a warning.
 3. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 4. Push to `main`. The **Deploy to GitHub Pages** workflow runs the checks and tests, builds the static site with the right base path, and publishes it to `https://<user>.github.io/<repo>/`.
 
@@ -168,7 +168,7 @@ The proofs also found **4 problems** in the version deployed before them, each k
 | `npm test` | Matching engine: search, rules, score, rate, the database against the reference, the doc's cases, speed, the price feed |
 | `npm run prove` | The proofs (Z3) and the checks that tie them to the code; writes `proofs/REPORT.md` (about 9 minutes) |
 | `npm run test:db` | Runs every migration on in-memory Postgres and checks 58 rules: order flow, stock maths, who can see and change what |
-| `npm run test:e2e` | Playwright: a farmer, a restaurant and a household trade end to end. In demo mode they take turns in one browser (`e2e/demo.spec.ts`); with `E2E_SUPABASE=1` and a Supabase project they use three browsers at once. `E2E_CHANNEL=msedge` uses the installed Edge |
+| `npm run test:e2e` | Playwright: a farmer, a restaurant and a household trade end to end. In demo mode they take turns in one browser (`e2e/demo.spec.ts`); connected to Supabase they use three browsers at once (`e2e/marketplace.spec.ts`, which creates real test accounts in that project). The app's mode picks the test. `E2E_CHANNEL=msedge` uses the installed Edge |
 | `npm run check:i18n` | Every English key has a Hindi twin, and every key used in code exists |
 | `npm run check:contrast` | Every text/background token pair meets WCAG AA in light and dark |
 | `npm run db:bundle` | Rebuilds `supabase/setup.sql` from `supabase/migrations/` |

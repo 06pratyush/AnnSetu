@@ -34,18 +34,27 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Build static site
-        # The URL and anon/publishable key are public by design (they ship inside the site), so a
-        # repository variable is enough; a secret of the same name works too.
+        # The URL and publishable key are public by design (they ship inside the site), so
+        # repository variables are enough; secrets of the same names work too. The site uses
+        # Supabase only once its database is set up (supabase/setup.sql); until then, demo mode.
         run: |
           if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "::warning::No Supabase URL/key set: the site will say it isn't connected to its database. See README, step 1."
+            echo "::notice::No Supabase project set: building in demo mode (the database runs in the browser)."
+          else
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/items?select=id&limit=1" -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY")
+            if [ "$code" = "200" ]; then
+              echo "::notice::Building against Supabase."
+            else
+              echo "::warning::Supabase is set, but its database isn't set up yet (HTTP $code): building in demo mode. Run supabase/setup.sql in the SQL Editor, then re-run this workflow."
+              unset NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY
+            fi
           fi
           npm run build
         env:
           # /<repo-name> for a project site; empty for <user>.github.io
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

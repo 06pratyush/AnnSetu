@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { isDemoMode } from "./mode";
 
 // Three people signed in at the same time in separate browser contexts. A farmer lists tomatoes
 // (typed in Hinglish). A restaurant finds them by search and orders; the farmer sees it arrive live,
@@ -6,9 +7,9 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 // share a trip with neighbours. The restaurant rates the order and posts a requirement that reaches
 // the farmer's demand panel.
 
-// Three browsers share one database, so this needs a Supabase project: E2E_SUPABASE=1 npm run test:e2e.
-// Without one, demo.spec.ts runs the same story in demo mode.
-test.skip(!process.env.E2E_SUPABASE, "needs a Supabase project (set E2E_SUPABASE=1)");
+// Three browsers share one database, so this needs the app connected to Supabase (.env.local, or
+// E2E_BASE_URL pointing at the deployed site). In demo mode, demo.spec.ts runs the same story.
+// It creates real accounts in that project (…@example.com), so run it on a project you can tidy.
 
 const run = Date.now().toString(36);
 const VARIETY = `E2E ${run}`;
@@ -75,7 +76,8 @@ async function buy(page: Page, kg: number) {
   await expect(page.getByText("Order placed").first()).toBeVisible();
 }
 
-test("farmer and buyers trade at the same time", async ({ browser }) => {
+test("farmer and buyers trade at the same time", async ({ browser, baseURL }) => {
+  test.skip(await isDemoMode(baseURL), "the app is in demo mode: demo.spec.ts runs instead");
   const farmer = await newPerson(browser, FARM);
   const restaurant = await newPerson(browser, CITY);
   const home = await newPerson(browser, CITY);

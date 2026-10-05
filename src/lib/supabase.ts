@@ -2,7 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createDemoClient } from "./demo/client";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// The publishable key (sb_publishable_…), or the legacy anon key under its old name.
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /** False until the Supabase URL and anon/publishable key are set at build time. */
 export const isSupabaseConfigured = Boolean(url && anonKey);

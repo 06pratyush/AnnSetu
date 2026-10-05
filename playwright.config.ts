@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// End-to-end tests. Without a Supabase project, demo.spec.ts runs the whole story in demo mode.
-// With one (email confirmation off), E2E_SUPABASE=1 also runs marketplace.spec.ts with three browsers.
+// End-to-end tests. The app's mode picks the story: in demo mode demo.spec.ts (people take turns in
+// one browser); connected to Supabase (email confirmation off), marketplace.spec.ts (three browsers).
 // Against the deployed site: E2E_BASE_URL=https://<user>.github.io/<repo> npm run test:e2e.
 // E2E_CHANNEL=msedge (or chrome) uses an installed browser instead of Playwright's own download.
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
